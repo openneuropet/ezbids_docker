@@ -4,7 +4,6 @@
     # the following files are required for https to work:" 
     #   nginx/ssl/sslcert.cert"
     #   nginx/ssl/sslcert.key"
-    #   nginx/ssl/sslpassword" # note you can disable the password requirement for nginx by omitting this field and commenting or deleting the requirement in the  nginx production NGINX_CONFIG_FILE
     # for https to work"
 # 2) copy the example.env file to .env
 # 3) Move the ssl certs to the nginx/ssl folder
@@ -21,7 +20,28 @@ openssl req -x509 -newkey rsa:4096 -keyout sslcert.key -out sslcert.cert -sha256
 mv sslcert.key nginx/ssl/
 mv sslcert.cert nginx/ssl/
 
-# now we need to copy the example.env file to .env
-cp example.env .env
+# now we need to setup the .env file, for simplicity's sake we create one here:
+cat <<EOL > .env
+SERVER_NAME=$HOSTNAME
+
+# set this to either nginx/production_nginx.conf  or nginx/development_nginx.conf
+NGINX_CONFIG_FILE=nginx/production_nginx.conf
+
+BRAINLIFE_PRODUCTION=true
+
+# Set the BRAINLIFE_AUTHENTICATION environment variable to true, if you're not running
+# this with brainlife don't use.
+BRAINLIFE_AUTHENTICATION=false
+
+# Set the BRAINLIFE_DEVELOPMENT enables additional debugging output and mounts 
+# the ezbids repo/folder into the various containers default is false
+BRAINLIFE_DEVELOPMENT=false
+
+# Collect telemetry data and store it locally using the telemetry container
+HOST_LOCAL_TELEMETRY=false
+EOL
+
+echo ".env file created successfully."
+
 
 
