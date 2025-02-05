@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# This is the main entry point launching a local/on premises install of ezBIDS.
+# Environment variables are loaded from the .env file, then either an SSL HTTPS
+# Nginx routed version of ezBIDS is launched or a plain "develoment" version using
+# docker's built in network. It's recommended to use the HTTPS version as browsers 
+# are getting more and more particular about CORS (Cross Origin Requests).
+
+# If this setup is being run locally and does not require an SSL certificate signed
+# by an external authority one can run `create_self_signed_certs.sh` before this 
+# script to automatically generate and locate those certificates into the nginx/ssl/ 
+# folder.
+
 # check to see if a .env file exists
 if [ -f .env ]; then
     echo ".env file exists, loading environment variables from .env file"
