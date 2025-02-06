@@ -6,4 +6,3 @@ WORKDIR /ui
 RUN npm install
 
 CMD [ "npm", "run", "build"] 
-

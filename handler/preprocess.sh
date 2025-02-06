@@ -121,7 +121,7 @@ else
         path=$1
 
         echo "----------------------- dcm2niix4pet: $path ------------------------"
-        timeout 3600 dcm2niix4pet --silent $path
+        timeout 3600 dcm2niix4pet --silent --ezbids $path
 
         #all good
         echo $path >> pet2bids.done
