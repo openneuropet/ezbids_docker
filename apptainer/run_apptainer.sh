@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+source ../.env
+
+echo "Showing existing environment"
+env 
+
 ./dev_apptainer.sh
 
 if [ ! -e "mongodb.sif" ]; then
