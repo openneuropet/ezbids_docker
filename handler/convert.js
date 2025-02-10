@@ -110,6 +110,22 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
         let fullpath = root + "/" + path + "/" + name + "_" + filename;
         if (item.name == "json") {
             //we create sidecar from sidecar object (edited by the user)
+            
+            // Remove acquisition date/time information for privacy
+            if (item.sidecar) {
+                delete item.sidecar.AcquisitionDate;
+                delete item.sidecar.AcquisitionDateTime;
+                
+                // Optionally keep just the time if needed
+                if (item.sidecar.AcquisitionTime) {
+                    // Keep AcquisitionTime as it might be needed for analysis
+                    // but ensure no date information is embedded in it
+                    if (item.sidecar.AcquisitionTime.includes('T')) {
+                        item.sidecar.AcquisitionTime = item.sidecar.AcquisitionTime.split('T')[1];
+                    }
+                }
+            }
+            
             item.content = JSON.stringify(item.sidecar, null, 4);
         }
         if (item.content) {
