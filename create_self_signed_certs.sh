@@ -8,9 +8,13 @@
 # 2) copy the example.env file to .env
 # 3) Move the ssl certs to the nginx/ssl folder
 
-# lets start by collecting the host name from this machine and using that to autogenerate the ssl certs
-HOSTNAME=$(hostname)
-echo "Host name: $HOSTNAME"
+if [ -z "$1" ]; then
+    HOSTNAME=$(hostname)
+    echo "No hostname provided, using system hostname: $HOSTNAME"
+else
+    HOSTNAME=$1
+    echo "Using provided hostname: $HOSTNAME"
+fi
 
 # you should modify statename, cityname, companyname ,and company section name to suit your installation
 
