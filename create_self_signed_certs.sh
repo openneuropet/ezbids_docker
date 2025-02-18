@@ -1,4 +1,5 @@
-#! /bin/bash
+#!/bin/bash
+
 # we're going to use this script to walk us through how to:
 # 1) generate some self signed ssl certs, making sure to follow the following 
     # the following files are required for https to work:" 
@@ -8,6 +9,7 @@
 # 2) copy the example.env file to .env
 # 3) Move the ssl certs to the nginx/ssl folder
 
+# Use provided hostname or get it from system
 if [ -z "$1" ]; then
     HOSTNAME=$(hostname)
     echo "No hostname provided, using system hostname: $HOSTNAME"
@@ -46,6 +48,3 @@ HOST_LOCAL_TELEMETRY=false
 EOL
 
 echo ".env file created successfully."
-
-
-
