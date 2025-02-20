@@ -1,20 +1,65 @@
 import os
 import time
 import subprocess
+import re
+import contextlib
+import io
+import sys
 from pydicom import dcmread
 from pathlib import Path
 from datetime import datetime
 import shutil
+
+@contextlib.contextmanager
+def nostdout():
+    """Suppress stdout temporarily"""
+    save_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    yield
+    sys.stdout = save_stdout
+
+def is_potential_dicom(file_path):
+    """
+    Check if a file might be a DICOM based on its name/extension.
+    
+    Args:
+        file_path (Path): Path object to the file
+    
+    Returns:
+        bool: True if the file might be a DICOM
+    """
+    suffix = file_path.suffix
+    
+    # if there are multiple suffixes, join them together
+    if len(file_path.suffixes) > 1:
+        suffix = "".join(file_path.suffixes)
+    
+    return (suffix.lower() in [".dcm", ".ima", ".img", ""] or
+            "mr" in str(file_path.name).lower() or
+            bool(re.search(r"\d", suffix.lower())))
+
+def find_dicom_files(folder_path):
+    """
+    Find all potential DICOM files in a folder.
+    
+    Args:
+        folder_path (str or Path): Path to the folder to search
+    
+    Returns:
+        list: List of Path objects for potential DICOM files
+    """
+    folder_path = Path(folder_path)
+    return [f for f in folder_path.iterdir() if f.is_file() and is_potential_dicom(f)]
 
 def benchmark_pydicom(folder_path):
     """Benchmark reading DICOM headers using pydicom"""
     start_time = time.time()
     count = 0
     
-    for file in Path(folder_path).glob('*.dcm'):
+    for file in find_dicom_files(folder_path):
         try:
-            # Read only the header (stop_before_pixels=True for efficiency)
-            ds = dcmread(str(file), stop_before_pixels=True)
+            with nostdout():
+                ds = dcmread(str(file), stop_before_pixels=True)
             count += 1
         except Exception as e:
             print(f"Error reading {file}: {e}")
@@ -28,13 +73,12 @@ def benchmark_dcmdump(folder_path):
     count = 0
     
     try:
-        # Use find with -exec to process files (more direct than xargs)
-        cmd = f"find {folder_path} -name '*.dcm' -exec dcmdump {{}} \\;"
-        print(cmd)
+        # Create a temporary file with the list of potential DICOM files
+        dicom_files = find_dicom_files(folder_path)
+        cmd = f"find {folder_path} -type f -exec dcmdump {{}} \\;"
         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         
-        # Count the number of files processed (each file starts with "# dcmdump")
         count = stdout.count(b'# Dicom-File-Format')
         
     except Exception as e:
@@ -61,11 +105,11 @@ def inspect_dicoms(source_folder):
     source_path = Path(source_folder)
     organization = {}
     error_count = 0
-    
-    for dicom_file in source_path.glob('*.dcm'):
+    dicom_files = find_dicom_files(source_folder)
+    for dicom_file in dicom_files:
         try:
-            # Read DICOM header
-            ds = dcmread(str(dicom_file), stop_before_pixels=True)
+            with nostdout():
+                ds = dcmread(str(dicom_file), stop_before_pixels=True)
             
             # Get patient ID (fall back to patient name if ID not available)
             patient_id = getattr(ds, 'PatientID', None) or getattr(ds, 'PatientName', 'unknown_patient')
@@ -96,7 +140,7 @@ def inspect_dicoms(source_folder):
             print(f"Error inspecting {dicom_file}: {e}")
             error_count += 1
     
-    return organization, error_count
+    return organization, error_count, dicom_files
 
 def copy_organized_dicoms(organization, output_base):
     """
@@ -196,7 +240,7 @@ def cleanup_source_files(organization, copied_count):
     
     return deleted_count, error_count
 
-def handle_non_dicom_files(source_folder, organization, output_base):
+def handle_non_dicom_files(source_folder, organization, output_base, dicom_files=None):
     """
     Copy non-DICOM files to each session folder.
     
@@ -215,8 +259,11 @@ def handle_non_dicom_files(source_folder, organization, output_base):
     non_dicom_files = []
     
     # Find all non-DICOM files
+    if dicom_files is None:
+        dicom_files = set(find_dicom_files(source_folder))
+    
     for file_path in source_path.iterdir():
-        if file_path.is_file() and file_path.suffix.lower() != '.dcm':
+        if file_path.is_file() and file_path not in dicom_files:
             non_dicom_files.append(file_path)
     
     if not non_dicom_files:
@@ -244,7 +291,7 @@ if __name__ == "__main__":
     output_base = "/home/anthony/ezbids/OpenNeuroPET-Phantoms/sourcedata/GeneralElectricAdvance-NIMH/organized_dicoms"
     
     print(f"\nInspecting DICOM files in {source_folder}")
-    organization, inspect_errors = inspect_dicoms(source_folder)
+    organization, inspect_errors, dicom_files = inspect_dicoms(source_folder)
     
     print(f"\nFound:")
     for subject_id, sessions in organization.items():
@@ -281,18 +328,18 @@ if __name__ == "__main__":
     print(f"Errors during inspection: {inspect_errors}")
     print(f"Errors during copying: {copy_errors}")
     
-    if copy_errors == 0 and inspect_errors == 0 and non_dicom_errors == 0:
-        print("\nCleaning up source files...")
-        deleted, delete_errors = cleanup_source_files(organization, copied)
-        print(f"Successfully deleted: {deleted} files")
-        print(f"Errors during cleanup: {delete_errors}")
+    # if copy_errors == 0 and inspect_errors == 0 and non_dicom_errors == 0:
+    #     print("\nCleaning up source files...")
+    #     deleted, delete_errors = cleanup_source_files(organization, copied)
+    #     print(f"Successfully deleted: {deleted} files")
+    #     print(f"Errors during cleanup: {delete_errors}")
         
-        # Clean up non-DICOM files if they were all copied successfully
-        if non_dicom_files and non_dicom_errors == 0:
-            print("\nCleaning up non-DICOM files...")
-            for file_path in non_dicom_files:
-                try:
-                    file_path.unlink()
-                    print(f"Deleted: {file_path.name}")
-                except Exception as e:
-                    print(f"Error deleting {file_path}: {e}") 
+    #     # Clean up non-DICOM files if they were all copied successfully
+    #     if non_dicom_files and non_dicom_errors == 0:
+    #         print("\nCleaning up non-DICOM files...")
+    #         for file_path in non_dicom_files:
+    #             try:
+    #                 file_path.unlink()
+    #                 print(f"Deleted: {file_path.name}")
+    #             except Exception as e:
+    #                 print(f"Error deleting {file_path}: {e}") 
