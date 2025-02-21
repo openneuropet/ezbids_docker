@@ -4,6 +4,12 @@ import os
 import sys
 from pathlib import Path
 from pydicom import dcmread
+from presort_dicoms import presort
+
+# presort can slow down ezBIDS as it examines every dicom, it's enabled/disabled
+# by setting the PRESORT environment varibable to "true" or ""
+presort_enabled = bool(os.getenv('PRESORT', 'false').lower() == 'true')
+
 # if pet2bids is installed we use it wherever the PET data live
 try:
     # import pypet2bids
@@ -13,6 +19,7 @@ except (ImportError, ModuleNotFoundError):
     pet2bidsInstalled = False
     print('pet2bids is not installed, using dcm2niix on PET directories instead')
     sys.exit(1)
+
 
 
 def find_img_data(dir):
@@ -64,6 +71,15 @@ find_img_data('.')
 
 # PET
 pet_folders = [str(folder) for folder in is_pet.pet_folder(Path(root).resolve(), skim=True, njobs=4)]
+
+# presort the pet folders into sub/ses folders if presorting is enabled.
+if presort_enabled:
+    new_pet_folders = []
+    for pet_folder in pet_folders:
+        presort(pet_folder)
+        new_pet_folders += [str(folder) for folder in is_pet.pet_folder(Path(pet_folder).resolve(), skim=True, njobs=4)]         
+    pet_folders = new_pet_folders
+
 pet_folders = [os.path.relpath(x, root) for x in pet_folders if x != '']
 pet_folders = [os.path.join('.', x) for x in pet_folders]
 
@@ -81,6 +97,8 @@ if pet_folders:
             if not x.endswith(tuple(['.nii', '.nii.gz', '.v', '.v.gz', '.json', '.tsv']))
         ]
         if len(dcms) and pet not in pet_dcm_dirs_list:
+            # this is where the slowdown happens, make sure to disable presort with export PRESORT=false or PRESORT=
+            # to disable this behavior
             pet_dcm_dirs_list.append(pet)
 
 # MEG

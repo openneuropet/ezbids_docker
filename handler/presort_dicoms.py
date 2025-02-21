@@ -9,6 +9,7 @@ from pydicom import dcmread
 from pathlib import Path
 from datetime import datetime
 import shutil
+import argparse
 
 @contextlib.contextmanager
 def nostdout():
@@ -284,11 +285,24 @@ def handle_non_dicom_files(source_folder, organization, output_base, dicom_files
     
     return copied_count, error_count, non_dicom_files
 
-if __name__ == "__main__":
-    folder_path = "/home/anthony/ezbids/OpenNeuroPET-Phantoms/sourcedata/GeneralElectricAdvance-NIMH/consolidated_dicoms"
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Presort DICOM files')
+    parser.add_argument('--source', type=str, help='Path to source folder', required=True)
+    parser.add_argument('--destination', type=str, help='Path to destination folder, if not provided, will use the source folder', default=None)
+    args = parser.parse_args()
+
+    if args.destination is None:
+        args.destination = args.source
+    return args
+
+def presort(source_folder, output_base=None):
+
+    if output_base is None:
+        output_base = source_folder
     
-    source_folder = folder_path
-    output_base = "/home/anthony/ezbids/OpenNeuroPET-Phantoms/sourcedata/GeneralElectricAdvance-NIMH/organized_dicoms"
+    #source_folder = folder_path
+    #output_base = "/home/anthony/ezbids/OpenNeuroPET-Phantoms/sourcedata/GeneralElectricAdvance-NIMH/organized_dicoms"
     
     print(f"\nInspecting DICOM files in {source_folder}")
     organization, inspect_errors, dicom_files = inspect_dicoms(source_folder)
@@ -328,18 +342,24 @@ if __name__ == "__main__":
     print(f"Errors during inspection: {inspect_errors}")
     print(f"Errors during copying: {copy_errors}")
     
-    # if copy_errors == 0 and inspect_errors == 0 and non_dicom_errors == 0:
-    #     print("\nCleaning up source files...")
-    #     deleted, delete_errors = cleanup_source_files(organization, copied)
-    #     print(f"Successfully deleted: {deleted} files")
-    #     print(f"Errors during cleanup: {delete_errors}")
+    if copy_errors == 0 and inspect_errors == 0 and non_dicom_errors == 0 and (source_folder == output_base):
+        print("\nCleaning up source files...")
+        deleted, delete_errors = cleanup_source_files(organization, copied)
+        print(f"Successfully deleted: {deleted} files")
+        print(f"Errors during cleanup: {delete_errors}")
         
-    #     # Clean up non-DICOM files if they were all copied successfully
-    #     if non_dicom_files and non_dicom_errors == 0:
-    #         print("\nCleaning up non-DICOM files...")
-    #         for file_path in non_dicom_files:
-    #             try:
-    #                 file_path.unlink()
-    #                 print(f"Deleted: {file_path.name}")
-    #             except Exception as e:
-    #                 print(f"Error deleting {file_path}: {e}") 
+        # Clean up non-DICOM files if they were all copied successfully
+        if non_dicom_files and non_dicom_errors == 0:
+            print("\nCleaning up non-DICOM files...")
+            for file_path in non_dicom_files:
+                try:
+                    file_path.unlink()
+                    print(f"Deleted: {file_path.name}")
+                except Exception as e:
+                    print(f"Error deleting {file_path}: {e}")
+
+if __name__ == "__main__":
+    args = parse_args()
+    source_folder = args.source
+    output_base = args.destination
+    presort(source_folder, output_base)
