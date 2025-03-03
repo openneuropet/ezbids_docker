@@ -52,6 +52,7 @@ services:
                 condition: service_healthy
         environment:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
+            PRESORT: ${PRESORT}
         networks:
             - ezbids
         tty: true #turn on color for bids-validator output
