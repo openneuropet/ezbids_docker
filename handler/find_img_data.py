@@ -9,6 +9,7 @@ from presort_dicoms import presort
 # presort can slow down ezBIDS as it examines every dicom, it's enabled/disabled
 # by setting the PRESORT environment varibable to "true" or ""
 presort_enabled = bool(os.getenv('PRESORT', 'false').lower() == 'true')
+presort_enabled_pet = bool(os.getenv('PREESORT_PET', 'false').lower == 'true')
 
 # if pet2bids is installed we use it wherever the PET data live
 try:
@@ -32,7 +33,6 @@ def find_img_data(dir):
     dir : string
         root-level directory of uploaded data
     '''
-
     hasImgData = False
 
     # MRI (raw only)
@@ -67,19 +67,11 @@ pet_ecat_files_list = []
 pet_dcm_dirs_list = []
 meg_data_list = []
 
-find_img_data('.')
+root_full_path = str(Path(root).absolute())
+
 
 # PET
 pet_folders = [str(folder) for folder in is_pet.pet_folder(Path(root).resolve(), skim=True, njobs=4)]
-
-# presort the pet folders into sub/ses folders if presorting is enabled.
-if presort_enabled:
-    new_pet_folders = []
-    for pet_folder in pet_folders:
-        presort(pet_folder)
-        new_pet_folders += [str(folder) for folder in is_pet.pet_folder(Path(pet_folder).resolve(), skim=True, njobs=4)]         
-    pet_folders = new_pet_folders
-
 pet_folders = [os.path.relpath(x, root) for x in pet_folders if x != '']
 pet_folders = [os.path.join('.', x) for x in pet_folders]
 
@@ -97,8 +89,6 @@ if pet_folders:
             if not x.endswith(tuple(['.nii', '.nii.gz', '.v', '.v.gz', '.json', '.tsv']))
         ]
         if len(dcms) and pet not in pet_dcm_dirs_list:
-            # this is where the slowdown happens, make sure to disable presort with export PRESORT=false or PRESORT=
-            # to disable this behavior
             pet_dcm_dirs_list.append(pet)
 
 # MEG
@@ -121,13 +111,23 @@ if len(meg_data_list):
 file = open(f'{root}/dcm2niix.list', 'w')
 if len(mri_dcm_dirs_list):
     for dcm in mri_dcm_dirs_list:
-        file.write(dcm + '\n')
+        if presort_enabled:
+            presorted_dicoms = presort(dcm)
+            for pre in presorted_dicoms:
+                file.write(str(pre)+ '\n')
+        else:
+            file.write(dcm + '\n')
 file.close()
 
 if len(pet_dcm_dirs_list):
     file = open(f'{root}/pet2bids_dcm.list', 'w')
     for dcm in pet_dcm_dirs_list:
-        file.write(dcm + '\n')
+        if presort_enabled:
+            presorted_folders = presort(dcm)
+            for pre in presorted_folders:
+                file.write(str(pre) + '\n')
+        else:
+            file.write(dcm + '\n')
     file.close()
 
 if len(pet_ecat_files_list):
