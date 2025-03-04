@@ -1,6 +1,5 @@
 FROM neurodebian:nd20.04-non-free
 
-COPY . /app
 
 SHELL ["/bin/bash", "-c"]
 
@@ -95,6 +94,9 @@ ENV PATH $NVM_DIR/v$NODE_VERSION/bin:$PATH
 RUN npm install -g npm@9.5.1
 RUN npm install -g bids-validator@1.14.8
 RUN git clone https://github.com/bids-standard/bids-validator
+
+# move copy to last step to save time on container rebuilding
+COPY . /app
 
 # install source code from local
 WORKDIR /app/handler
