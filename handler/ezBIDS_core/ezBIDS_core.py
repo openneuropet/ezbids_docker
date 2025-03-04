@@ -1937,7 +1937,8 @@ def create_lookup_info():
                                         "anatt1",
                                         "anat_t1",
                                         "3dt1",
-                                        "3d_t1"
+                                        "3d_t1",
+                                        "tse2-5" # added for NRU MR's
                                     ]
                                 )
                                 lookup_dic[datatype][suffix]["conditions"].extend(
