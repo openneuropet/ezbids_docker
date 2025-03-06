@@ -6,6 +6,9 @@ export APPTAINER_ALLOW_SETUID=0
 # Add /sbin to PATH for iptables
 export PATH="/sbin:$PATH"
 
+# Set CNI plugin path for Apptainer networking
+export CNI_PATH=/usr/lib/cni
+
 source ../.env
 
 # Set default if not set in .env
@@ -16,6 +19,49 @@ if [ ! -x "/sbin/iptables" ]; then
     echo "iptables not found. Please install iptables:"
     echo "apt-get update && apt-get install -y iptables"
     exit 1
+fi
+
+# Check and install CNI plugins (required for container port forwarding)
+if [ ! -d "/usr/lib/cni" ]; then
+    echo "CNI plugins not found. Installing containernetworking-plugins..."
+    sudo apt-get update && sudo apt-get install -y containernetworking-plugins
+    if [ $? -ne 0 ]; then
+        echo "Failed to install CNI plugins. Port forwarding will not work."
+        exit 1
+    fi
+fi
+
+# Ensure CNI configuration directory exists and is writable
+CNI_CONF_DIR="${HOME}/.config/apptainer/network"
+mkdir -p "${CNI_CONF_DIR}"
+if [ ! -f "${CNI_CONF_DIR}/00-bridge.conflist" ]; then
+    echo "Creating CNI bridge network configuration..."
+    cat > "${CNI_CONF_DIR}/00-bridge.conflist" <<EOT
+{
+    "cniVersion": "0.4.0",
+    "name": "bridge",
+    "plugins": [
+        {
+            "type": "bridge",
+            "bridge": "sbr0",
+            "isGateway": true,
+            "ipMasq": true,
+            "ipam": {
+                "type": "host-local",
+                "ranges": [
+                    [{
+                        "subnet": "10.22.0.0/16"
+                    }]
+                ]
+            }
+        },
+        {
+            "type": "portmap",
+            "capabilities": {"portMappings": true}
+        }
+    ]
+}
+EOT
 fi
 
 echo "Showing existing environment"
@@ -40,10 +86,6 @@ if [ ! -e "mongodb.sif" ]; then
     apptainer build mongodb.sif docker://mongo:4.4.15
 fi
 
-if [ ! -e "nginx.sif" ]; then
-    apptainer build nginx.sif docker://nginx:latest
-fi
-
 if [ ! -e "api_overlay.img" ]; then
     apptainer overlay create api_overlay.img
 fi
@@ -58,10 +100,6 @@ fi
 
 if [ ! -e "ui_overlay.img" ]; then
     apptainer overlay create ui_overlay.img
-fi
-
-if [ ! -e "nginx_overlay.img" ]; then
-    apptainer overlay create nginx_overlay.img
 fi
 
 # Clean up any existing instances
@@ -182,29 +220,45 @@ echo "UI IP: ${UI_IP}"
 
 # Update nginx config with API IP and SERVER_NAME
 echo "Updating nginx config with API IP and SERVER_NAME..."
-cp ../nginx/production_nginx.conf /tmp/production_nginx.conf
-sed -i "s|http://api:8082/|http://${API_IP}:8082/|g" /tmp/production_nginx.conf
-sed -i "s|\$SERVER_NAME|${SERVER_NAME}|g" /tmp/production_nginx.conf
+cp ../nginx/apptainer_nginx.conf /tmp/apptainer_nginx.conf
+sed -i "s|\$API_IP|${API_IP}|g" /tmp/apptainer_nginx.conf
+sed -i "s|\$SERVER_NAME|${SERVER_NAME}|g" /tmp/apptainer_nginx.conf
 
 echo "SERVER_NAME=${SERVER_NAME}"
 
-# Start nginx container
-echo "Starting nginx container..."
-apptainer instance start \
-    --net \
-    --network-args "portmap=443:443/tcp" \
-    --overlay nginx_overlay.img \
-    --bind ../nginx/ssl/:/etc/nginx/conf.d/ssl/ \
-    --bind /tmp/production_nginx.conf:/etc/nginx/conf.d/default.conf \
-    --bind ../ui/dist:/usr/share/nginx/html/ezbids:ro \
-    nginx.sif nginx
+# Install and configure native nginx
+if ! command -v nginx &> /dev/null; then
+    echo "Installing nginx..."
+    sudo apt-get update && sudo apt-get install -y nginx
+fi
 
-# Start nginx process with error logging but keep it running in daemon mode
-echo "Starting nginx process..."
-apptainer exec instance://nginx bash -c 'nginx && tail -f /var/log/nginx/error.log'
+# Stop nginx if it's running
+sudo systemctl stop nginx
 
-# Get nginx IP and export it
-export NGINX_IP=$(get_container_ip "nginx")
+# Create nginx directories if they don't exist
+sudo mkdir -p /etc/nginx/conf.d/ssl
+
+# Copy SSL certificates
+sudo cp ../nginx/ssl/sslcert.cert /etc/nginx/conf.d/ssl/
+sudo cp ../nginx/ssl/sslcert.key /etc/nginx/conf.d/ssl/
+sudo chmod 600 /etc/nginx/conf.d/ssl/sslcert.key
+
+# Copy and set up nginx config
+sudo cp /tmp/apptainer_nginx.conf /etc/nginx/conf.d/default.conf
+
+# Create UI directory and copy files
+sudo mkdir -p /usr/share/nginx/html/ezbids
+sudo cp -r ../ui/dist/* /usr/share/nginx/html/ezbids/
+
+# Test nginx config
+echo "Testing nginx configuration..."
+sudo nginx -t
+
+# Start nginx
+echo "Starting nginx..."
+sudo systemctl start nginx
+
+export NGINX_IP="127.0.0.1"
 echo "NGINX IP: ${NGINX_IP}"
 
 # Start Telemetry container (if enabled)
