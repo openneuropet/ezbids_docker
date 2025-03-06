@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 
+# Disable setuid to avoid requiring sudo
+export APPTAINER_ALLOW_SETUID=0
+
+# Add /sbin to PATH for iptables
+export PATH="/sbin:$PATH"
+
 source ../.env
 
 # Set default if not set in .env
 EZBIDS_TMP_DIR=${EZBIDS_TMP_DIR:-/tmp}
 
 # Check and install required tools
-if ! command -v iptables &> /dev/null; then
-    echo "iptables not found. Installing..."
-    sudo apt-get update && sudo apt-get install -y iptables
-fi
-
-if ! command -v jq &> /dev/null; then
-    echo "jq not found. Installing..."
-    sudo apt-get update && sudo apt-get install -y jq
+if [ ! -x "/sbin/iptables" ]; then
+    echo "iptables not found. Please install iptables:"
+    echo "apt-get update && apt-get install -y iptables"
+    exit 1
 fi
 
 echo "Showing existing environment"
 env 
-
-./dev_apptainer.sh
 
 # Function to get container IP
 get_container_ip() {
@@ -40,6 +40,10 @@ if [ ! -e "mongodb.sif" ]; then
     apptainer build mongodb.sif docker://mongo:4.4.15
 fi
 
+if [ ! -e "nginx.sif" ]; then
+    apptainer build nginx.sif docker://nginx:latest
+fi
+
 if [ ! -e "api_overlay.img" ]; then
     apptainer overlay create api_overlay.img
 fi
@@ -54,6 +58,10 @@ fi
 
 if [ ! -e "ui_overlay.img" ]; then
     apptainer overlay create ui_overlay.img
+fi
+
+if [ ! -e "nginx_overlay.img" ]; then
+    apptainer overlay create nginx_overlay.img
 fi
 
 # Clean up any existing instances
@@ -161,11 +169,43 @@ apptainer instance start \
 # Start the UI container
 echo "Starting UI container..."
 apptainer instance start \
+    --net --network-args "portmap=3000:3000/tcp" \
     --env VITE_APIHOST="https://${SERVER_NAME}/api" \
     --env VITE_BRAINLIFE_AUTHENTICATION="${BRAINLIFE_AUTHENTICATION}" \
     --bind ../ui:/ui \
     ui.sif ui \
     bash -c "cd /ui && npm install && npm run build"
+
+# Get UI IP and export it
+export UI_IP=$(get_container_ip "ui")
+echo "UI IP: ${UI_IP}"
+
+# Update nginx config with API IP and SERVER_NAME
+echo "Updating nginx config with API IP and SERVER_NAME..."
+cp ../nginx/production_nginx.conf /tmp/production_nginx.conf
+sed -i "s|http://api:8082/|http://${API_IP}:8082/|g" /tmp/production_nginx.conf
+sed -i "s|\$SERVER_NAME|${SERVER_NAME}|g" /tmp/production_nginx.conf
+
+echo "SERVER_NAME=${SERVER_NAME}"
+
+# Start nginx container
+echo "Starting nginx container..."
+apptainer instance start \
+    --net \
+    --network-args "portmap=443:443/tcp" \
+    --overlay nginx_overlay.img \
+    --bind ../nginx/ssl/:/etc/nginx/conf.d/ssl/ \
+    --bind /tmp/production_nginx.conf:/etc/nginx/conf.d/default.conf \
+    --bind ../ui/dist:/usr/share/nginx/html/ezbids:ro \
+    nginx.sif nginx
+
+# Start nginx process with error logging but keep it running in daemon mode
+echo "Starting nginx process..."
+apptainer exec instance://nginx bash -c 'nginx && tail -f /var/log/nginx/error.log'
+
+# Get nginx IP and export it
+export NGINX_IP=$(get_container_ip "nginx")
+echo "NGINX IP: ${NGINX_IP}"
 
 # Start Telemetry container (if enabled)
 if [ "${COMPOSE_PROFILES}" = "telemetry" ]; then
@@ -181,3 +221,5 @@ echo "Environment variables set:"
 echo "MONGO_IP=${MONGO_IP}"
 echo "MONGO_CONNECTION_STRING=${MONGO_CONNECTION_STRING}"
 echo "API_IP=${API_IP}"
+echo "UI_IP=${UI_IP}"
+echo "NGINX_IP=${NGINX_IP}"
