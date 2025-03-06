@@ -2,10 +2,34 @@
 
 source ../.env
 
+# Set default if not set in .env
+EZBIDS_TMP_DIR=${EZBIDS_TMP_DIR:-/tmp}
+
+# Check and install iptables if not present
+if ! command -v iptables &> /dev/null; then
+    echo "iptables not found. Installing..."
+    sudo apt-get update && sudo apt-get install -y iptables
+fi
+
 echo "Showing existing environment"
 env 
 
 ./dev_apptainer.sh
+
+# Function to get container IP
+get_container_ip() {
+    local container_name=$1
+    local ip
+    ip=$(sudo apptainer instance list | grep "^${container_name} " | awk '{print $3}')
+    if [ -z "$ip" ]; then
+        echo "Error: Could not get IP for container ${container_name}" >&2
+        exit 1
+    fi
+    echo "$ip"
+}
+
+# Create necessary directories
+mkdir -p ${EZBIDS_TMP_DIR}/data/db
 
 if [ ! -e "mongodb.sif" ]; then
     apptainer build mongodb.sif docker://mongo:4.4.15
@@ -15,8 +39,6 @@ if [ ! -e "api_overlay.img" ]; then
     apptainer overlay create api_overlay.img
 fi
 
-# Maybe not needed?
-# Does the handler create data else where than tmp?
 if [ ! -e "handler_overlay.img" ]; then
     apptainer overlay create handler_overlay.img
 fi
@@ -25,39 +47,132 @@ if [ ! -e "mongo_overlay.img" ]; then
     apptainer overlay create mongo_overlay.img
 fi
 
-# Start MongoDB container
-echo "Starting MongoDB container..."
-apptainer instance run --hostname mongodb --overlay mongo_overlay.img mongodb.sif mongodb ./start_mongodb.sh
+if [ ! -e "ui_overlay.img" ]; then
+    apptainer overlay create ui_overlay.img
+fi
 
-# Wait for MongoDB to be ready
-echo "Waiting for MongoDB to be ready..."
-sleep 10  # Adjust this based on your needs (or add a health check here)
+# Clean up any existing instances
+echo "Cleaning up existing instances..."
+for instance in $(sudo apptainer instance list | tail -n +2 | awk '{print $1}'); do
+    echo "Stopping $instance..."
+    sudo apptainer instance stop $instance
+done
+
+# Start MongoDB container with network configuration
+echo "Starting MongoDB container..."
+sudo apptainer instance start \
+    --net --network-args "portmap=27017:27017/tcp" \
+    --overlay mongo_overlay.img \
+    --bind ${EZBIDS_TMP_DIR}/data/db:/data/db \
+    mongodb.sif mongodb
+
+# Start MongoDB process
+echo "Starting MongoDB process..."
+sudo apptainer exec instance://mongodb bash -c "mongod --bind_ip 0.0.0.0 --dbpath /data/db &"
+
+echo "Waiting for MongoDB to initialize..."
+sleep 10  # Increased wait time
+
+# Get MongoDB IP and verify it's running
+MONGO_IP=$(get_container_ip "mongodb")
+echo "MongoDB IP: ${MONGO_IP}"
+
+# Verify MongoDB is running and accessible
+echo "Verifying MongoDB is running..."
+max_attempts=12
+attempt=1
+mongo_running=false
+
+while [ $attempt -le $max_attempts ]; do
+    if sudo apptainer exec instance://mongodb mongo --eval "db.serverStatus()" > /dev/null 2>&1; then
+        echo "MongoDB is running and accessible"
+        mongo_running=true
+        break
+    fi
+    echo "Attempt $attempt/$max_attempts: MongoDB not yet accessible, waiting..."
+    sleep 5
+    ((attempt++))
+done
+
+if [ "$mongo_running" = false ]; then
+    echo "ERROR: MongoDB failed to start properly. Exiting."
+    exit 1
+fi
 
 # Start the API container
 echo "Starting API container..."
-apptainer instance run --overlay api_overlay.img --no-mount /etc/hosts --bind mongo_host:/etc/hosts api.sif api ./start_api.sh
+sudo apptainer instance start \
+    --net --network-args "portmap=8082:8082/tcp" \
+    --env MONGO_CONNECTION_STRING=mongodb://${MONGO_IP}:27017/ezbids \
+    --env NODE_ENV=production \
+    --env DEBUG=* \
+    --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    --bind ../api:/app/api \
+    --bind ${EZBIDS_TMP_DIR}:/tmp \
+    api.sif api
 
-# Wait for API to be ready
-echo "Waiting for API to be ready..."
-sleep 5  # Adjust based on your setup
+# Start the API process
+echo "Starting API process..."
+sudo apptainer exec instance://api bash -c "cd /app/api && ./start.sh"
+
+# Debug: Check if API process is running and show logs
+echo "$(date '+%H:%M:%S') Checking API process and logs..."
+echo "Process list:"
+sudo apptainer exec instance://api ps aux || true
+echo "Node processes:"
+sudo apptainer exec instance://api ps aux | grep node || true
+
+# Get API IP
+API_IP=$(get_container_ip "api")
+echo "API IP: ${API_IP}"
+
+# Wait for API to be healthy (no timeout for now)
+echo "$(date '+%H:%M:%S') Waiting for API to be healthy..."
+while true; do
+    if curl -f http://${API_IP}:8082/health; then
+        echo "$(date '+%H:%M:%S') API is healthy"
+        break
+    fi
+    echo "$(date '+%H:%M:%S') API not yet healthy, waiting..."
+    # Try to get Node process info
+    echo "Node process status:"
+    sudo apptainer exec instance://api ps aux | grep node || echo "No Node process found"
+    echo "Recent API logs:"
+    sudo apptainer exec instance://api bash -c "cd /app/api && tail -n 50 /tmp/ezbids.log" || true
+    sleep 5
+done
 
 # Start the Handler container
 echo "Starting Handler container..."
-apptainer instance run --overlay handler_overlay.img --no-mount /etc/hosts --bind mongo_host:/etc/hosts handler.sif handler ./start_handler.sh
-
-# Wait for Handler to be ready (optional)
-echo "Waiting for Handler to be ready..."
-sleep 5  # Adjust as needed
+sudo apptainer instance start \
+    --net \
+    --overlay handler_overlay.img \
+    --env MONGO_CONNECTION_STRING=mongodb://${MONGO_IP}:27017/ezbids \
+    --env NODE_ENV=production \
+    --bind ..:/app \
+    --bind ${EZBIDS_TMP_DIR}:/tmp \
+    handler.sif handler \
+    pm2 start handler.js --no-daemon
 
 # Start the UI container
 echo "Starting UI container..."
-apptainer instance run --env "VITE_APIHOST=http://localhost:8082"  ui.sif ui ./start_ui.sh
+sudo apptainer instance start \
+    --overlay ui_overlay.img \
+    --env VITE_APIHOST=https://${SERVER_NAME}/api \
+    --env VITE_BRAINLIFE_AUTHENTICATION=${BRAINLIFE_AUTHENTICATION} \
+    --bind ../ui:/ui \
+    ui.sif ui \
+    bash -c "cd /ui && npm install && npm run build"
 
-# Start Telemetry container (if in development profile)
-if [ "$PROFILE" == "development" ]; then
+# Start Telemetry container (if enabled)
+if [ "${COMPOSE_PROFILES}" = "telemetry" ]; then
     echo "Starting Telemetry container..."
-    apptainer instance run telemetry.sif telementry ./start_telementry.sh
+    sudo apptainer instance start \
+        --net \
+        telemetry.sif telemetry
 fi
 
-# Inform user that containers are running
-echo "All containers are running"
+echo "All services started. Use 'sudo apptainer instance list' to see running instances."
+echo "MongoDB IP: ${MONGO_IP}"
+echo "API IP: ${API_IP}"
+echo "Access the UI at https://${SERVER_NAME}"
