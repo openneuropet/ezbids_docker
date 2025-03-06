@@ -116,6 +116,10 @@ apptainer instance start \
     --bind ${EZBIDS_TMP_DIR}:/tmp \
     api.sif api
 
+# Create log file and set permissions
+echo "Setting up log file..."
+apptainer exec instance://api bash -c "touch /tmp/ezbids.log && chmod 666 /tmp/ezbids.log"
+
 # Install npm dependencies in API container
 echo "Installing dependencies in API container..."
 apptainer exec instance://api bash -c "cd /app/api && npm install"
