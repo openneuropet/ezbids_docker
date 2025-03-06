@@ -17,4 +17,11 @@ export default defineConfig({
     build: {
         sourcemap: true,
     },
+    // questionable if this is required
+    //define: {
+    //    'process.env.VITE_APIHOST': JSON.stringify(process.env.VITE_APIHOST || 'http://localhost:8082'),
+    //    'process.env.VITE_BRAINLIFE_AUTHENTICATION': JSON.stringify(
+    //        process.env.VITE_BRAINLIFE_AUTHENTICATION === 'true'
+    //    ),
+    //},
 });

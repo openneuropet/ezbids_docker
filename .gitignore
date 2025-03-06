@@ -46,3 +46,4 @@ __MACOSX
 .DS_Store
 OpenNeuroPET-Phantoms/
 PHANTOMS.zip
+*.img
