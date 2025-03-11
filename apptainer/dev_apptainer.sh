@@ -14,7 +14,7 @@ fi
 
 # check if reqired dir exists
 # Define the required structure
-required_dirs=("tmp" "tmp/data" "tmp/ezbids-workdir" "tmp/upload")
+required_dirs=("tmp" "tmp/data" "tmp/ezbids-workdir" "tmp/upload" "tmp/workdir")
 
 # Check and create each directory if missing
 for dir in "${required_dirs[@]}"; do
