@@ -4,6 +4,26 @@ cd ..
 
 set -ex
 
+# check to see if a .env file exists
+if [ -f apptainer/.env ]; then
+    echo ".env file exists, loading environment variables from .env file"
+else
+    echo ".env file does not exist, copying example.env to .env"
+    cp example.env apptainer/.env
+fi
+
+# check if reqired dir exists
+# Define the required structure
+required_dirs=("tmp" "tmp/data" "tmp/ezbids-workdir" "tmp/upload")
+
+# Check and create each directory if missing
+for dir in "${required_dirs[@]}"; do
+    if [ ! -d "$dir" ]; then
+        echo "Creating: $dir"
+        mkdir -p "$dir"
+    fi
+done
+
 # Parse arguments for authentication flag
 BRAINLIFE_AUTHENTICATION=true
 while getopts "d" flag; do
@@ -30,6 +50,7 @@ mkdir -p /tmp/upload
 mkdir -p /tmp/workdir
 
 # Prepare husky (if using it for git hooks)
+npm install husky --save-dev
 npm run prepare-husky
 
 # Generate keys (assuming this is a necessary setup step)
