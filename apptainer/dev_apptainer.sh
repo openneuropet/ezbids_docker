@@ -45,10 +45,6 @@ git submodule update --init --recursive
 (cd api && npm install)
 (cd ui && npm install)
 
-# Create necessary directories
-mkdir -p /tmp/upload
-mkdir -p /tmp/workdir
-
 # Prepare husky (if using it for git hooks)
 npm install husky --save-dev
 npm run prepare-husky
