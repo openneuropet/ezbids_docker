@@ -39,3 +39,7 @@ api/*.js.map
 # ssl certs we ignore the content of the folder but keep the folder around.
 nginx/ssl/*
 !nginx/ssl/.gitkeep
+
+# apptainer tmp dir
+tmp/
+
