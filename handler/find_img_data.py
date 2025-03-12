@@ -19,9 +19,8 @@ try:
 except (ImportError, ModuleNotFoundError):
     pet2bidsInstalled = False
     print('pet2bids is not installed, using dcm2niix on PET directories instead')
-    sys.exit(1)
-
-
+    # Don't exit, just continue without PET support
+    is_pet = None
 
 def find_img_data(dir):
     '''
@@ -33,30 +32,34 @@ def find_img_data(dir):
     dir : string
         root-level directory of uploaded data
     '''
+    global mri_dcm_dirs_list
     hasImgData = False
 
-    # MRI (raw only)
-    for x in sorted(os.listdir(dir)):
-        full_path = os.path.join(dir, x)
-        if os.path.isdir(full_path):
-            for f in sorted(os.listdir(full_path)):
-                try:
-                    read_file = dcmread(f'{full_path}/{f}')
-                    if read_file.Modality == 'MR':
-                        mri_dcm_dirs_list.append(full_path)
-                        hasImgData = True
-                        break
-                except:
-                    # Doesn't appear to be DICOM data, so skip
-                    break
+    with open('find_img_data.log', 'w') as log:
+        # MRI (raw only)
+        for root, dirs, files in os.walk(dir):
+            for f in sorted(files):
+                if f.endswith('.dcm'):
+                    try:
+                        log.write(f"Trying to read DICOM file: {os.path.join(root, f)}\n")
+                        read_file = dcmread(os.path.join(root, f))
+                        log.write(f"DICOM Modality: {read_file.Modality}\n")
+                        if read_file.Modality == 'MR':
+                            if root not in mri_dcm_dirs_list:
+                                log.write(f"Found MRI directory: {root}\n")
+                                mri_dcm_dirs_list.append(root)
+                                hasImgData = True
+                                break
+                    except Exception as e:
+                        log.write(f"Error reading DICOM file {f}: {str(e)}\n")
+                        continue
 
-    # Complete search
-    if not hasImgData:
-        for x in sorted(os.listdir(dir)):
-            full_path = os.path.join(dir, x)
-            if os.path.isdir(full_path):
-                find_img_data(full_path)
-
+        # Complete search
+        if not hasImgData:
+            for x in sorted(os.listdir(dir)):
+                full_path = os.path.join(dir, x)
+                if os.path.isdir(full_path):
+                    find_img_data(full_path)
 
 # change to input directory
 root = sys.argv[1]
@@ -69,6 +72,8 @@ meg_data_list = []
 
 root_full_path = str(Path(root).absolute())
 
+# Actually call find_img_data with the root directory
+find_img_data('.')
 
 # PET
 pet_folders = [str(folder) for folder in is_pet.pet_folder(Path(root).resolve(), skim=True, njobs=4)]
