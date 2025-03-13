@@ -35,11 +35,15 @@ def find_img_data(dir):
     global mri_dcm_dirs_list
     hasImgData = False
 
+    # Define common DICOM file extensions (lowercase)
+    dicom_extensions = ('.dcm', '.ima', '.img', '')
+
     with open('find_img_data.log', 'w') as log:
         # MRI (raw only)
         for root, dirs, files in os.walk(dir):
             for f in sorted(files):
-                if f.endswith('.dcm'):
+                # Case-insensitive extension check
+                if any(f.lower().endswith(ext) for ext in dicom_extensions):
                     try:
                         log.write(f"Trying to read DICOM file: {os.path.join(root, f)}\n")
                         read_file = dcmread(os.path.join(root, f))
@@ -115,20 +119,24 @@ if len(meg_data_list):
 # Save the MRI, PET, MEG, and NIfTI lists (if they exist) to separate files
 file = open(f'{root}/dcm2niix.list', 'w')
 if len(mri_dcm_dirs_list):
-    for dcm in mri_dcm_dirs_list:
+    # Sort the list before writing
+    sorted_mri_dirs = sorted(mri_dcm_dirs_list)
+    for dcm in sorted_mri_dirs:
         if presort_enabled:
-            presorted_dicoms = presort(dcm)
+            presorted_dicoms = sorted(presort(dcm))  # Sort presorted results too
             for pre in presorted_dicoms:
-                file.write(str(pre)+ '\n')
+                file.write(str(pre) + '\n')
         else:
             file.write(dcm + '\n')
 file.close()
 
 if len(pet_dcm_dirs_list):
     file = open(f'{root}/pet2bids_dcm.list', 'w')
-    for dcm in pet_dcm_dirs_list:
+    # Sort the list before writing
+    sorted_pet_dirs = sorted(pet_dcm_dirs_list)
+    for dcm in sorted_pet_dirs:
         if presort_enabled:
-            presorted_folders = presort(dcm)
+            presorted_folders = sorted(presort(dcm))  # Sort presorted results too
             for pre in presorted_folders:
                 file.write(str(pre) + '\n')
         else:
