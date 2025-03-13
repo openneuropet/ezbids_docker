@@ -23,7 +23,7 @@ services:
         platform: linux/amd64
         volumes:
             - ./api:/app/api
-            - ${EZBIDS_TMP_DIR:-/tmp}:/tmp
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
         depends_on:
             mongodb:
                 condition: service_healthy
@@ -44,7 +44,7 @@ services:
         platform: linux/amd64
         volumes:
             - .:/app
-            - ${EZBIDS_TMP_DIR:-/tmp}:/tmp
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
         depends_on:
             mongodb:
                 condition: service_healthy
