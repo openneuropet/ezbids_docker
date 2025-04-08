@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-cd ..
-
 set -ex
 
 # check to see if a .env file exists
@@ -12,11 +10,7 @@ else
     cp example.env .env
 fi
 
-# Ensure SERVER_NAME=localhost exists in .env
-if ! grep -q "^SERVER_NAME=" apptainer/.env; then
-    echo "SERVER_NAME=localhost" >> apptainer/.env
-    echo "Added SERVER_NAME=localhost to .env"
-fi
+cd ..
 
 # check if reqired dir exists
 # Define the required structure
