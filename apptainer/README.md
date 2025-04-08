@@ -1,6 +1,6 @@
 # Apptainer for ezBIDS
 
-This guide provides steps to convert Docker containers into Apptainer images and run them efficiently.
+This guide provides steps to convert Docker containers into Apptainer images and run them.
 
 ## Converting Docker to Apptainer
 
@@ -10,7 +10,7 @@ Run the following command to build and start the Docker containers:
 docker-compose up --build
 ```
 
-Once the containers are running, stop them with:
+If the containers are running, stop them with:
 ```sh
 docker-compose down
 ```
@@ -18,10 +18,10 @@ docker-compose down
 ### Step 2: Export Docker Images
 Save the running images to `.tar` files:
 ```sh
-docker save -o api_image.tar brainlife_ezbids-api
-docker save -o handler_image.tar brainlife_ezbids-handler
-docker save -o ui_image.tar brainlife_ezbids-ui
-docker save -o telemetry_image.tar brainlife_ezbids-telemetry
+docker save -o api_image.tar ezbids-api
+docker save -o handler_image.tar ezbids-handler
+docker save -o ui_image.tar ezbids-ui
+docker save -o telemetry_image.tar ezbids-telemetry
 ```
 For more information, refer to the Docker documentation: [Docker Save Command](https://docs.docker.com/reference/cli/docker/image/save/)
 
