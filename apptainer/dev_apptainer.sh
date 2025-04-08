@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-cd ..
-
 set -ex
 
 # check to see if a .env file exists
@@ -9,8 +7,10 @@ if [ -f apptainer/.env ]; then
     echo ".env file exists, loading environment variables from .env file"
 else
     echo ".env file does not exist, copying example.env to .env"
-    cp example.env apptainer/.env
+    cp example.env .env
 fi
+
+cd ..
 
 # check if reqired dir exists
 # Define the required structure
