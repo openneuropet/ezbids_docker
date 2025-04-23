@@ -9,6 +9,12 @@ EZBIDS_DIR=$(dirname `pwd`)
 # load the environment variables from the .env file
 source .env
 
+if [ ! -e "mongodb.sif" ]; then
+
+    apptainer build mongodb.sif docker://mongo:4.4.15
+
+fi
+
 # Start MongoDB container
 echo "Starting MongoDB container..."
 apptainer instance run --bind $EZBIDS_DIR:$EZBIDS_DIR --bind $EZBIDS_DIR/tmp:/tmp --bind $EZBIDS_DIR/tmp/data:/data --hostname mongodb mongodb.sif mongodb ./start_mongodb.sh
