@@ -37,6 +37,13 @@ while getopts "d" flag; do
 done
 
 export BRAINLIFE_AUTHENTICATION
+# Check Node.js version
+REQUIRED_NODE_VERSION="16"
+CURRENT_NODE_VERSION=$(node -v | cut -d '.' -f 1 | sed 's/v//')
+
+if [ "$CURRENT_NODE_VERSION" -ne "$REQUIRED_NODE_VERSION" ]; then
+    echo "Warning: You are using Node.js version $CURRENT_NODE_VERSION. It is recommended to use version $REQUIRED_NODE>    echo "Please switch to Node.js version $REQUIRED_NODE_VERSION."
+fi
 
 # Update git submodules
 git submodule update --init --recursive
