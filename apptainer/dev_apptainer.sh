@@ -12,6 +12,12 @@ else
     cp example.env apptainer/.env
 fi
 
+# Ensure SERVER_NAME=localhost exists in .env
+if ! grep -q "^SERVER_NAME=" apptainer/.env; then
+     echo "SERVER_NAME=localhost" >> apptainer/.env
+     echo "Added SERVER_NAME=localhost to .env"
+fi
+
 # check if reqired dir exists
 # Define the required structure
 required_dirs=("tmp" "tmp/data" "tmp/ezbids-workdir" "tmp/upload" "tmp/workdir")
