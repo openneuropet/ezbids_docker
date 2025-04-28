@@ -33,7 +33,7 @@ sleep 5  # Adjust based on your setup
 
 # Start the Handler container
 echo "Starting Handler container..."
-apptainer instance run --bind $EZBIDS_DIR:$EZBIDS_DIR --bind $EZBIDS_DIR/tmp:/tmp  --no-mount /etc/hosts --bind mongo_host:/etc/hosts handler.sif handler ./start_handler.sh
+apptainer instance run --env "PRESORT=$PRESORT" --bind $EZBIDS_DIR:$EZBIDS_DIR --bind $EZBIDS_DIR/tmp:/tmp --no-mount /etc/hosts --bind mongo_host:/etc/hosts handler.sif handler ./start_handler.sh
 
 # Wait for Handler to be ready (optional)
 echo "Waiting for Handler to be ready..."
