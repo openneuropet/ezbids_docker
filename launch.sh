@@ -44,35 +44,30 @@ else
   set -e
 fi
 
-# Check Node.js version
-REQUIRED_NODE_VERSION="16"
-CURRENT_NODE_VERSION=$(node -v | cut -d '.' -f 1 | sed 's/v//')
-
-if [ "$CURRENT_NODE_VERSION" -ne "$REQUIRED_NODE_VERSION" ]; then
-    echo "Warning: You are using Node.js version $CURRENT_NODE_VERSION. It is recommended to use version $REQUIRED_NODE_VERSION."
-    echo "Please switch to Node.js version $REQUIRED_NODE_VERSION."
-fi
-
-# build local changes and mount them directly into the containers
-# api/ and ui/ are mounted as volumes  at /app within the docker-compose.yml
-(cd api && npm install) || { echo "npm install failed in api"; exit 1; }
-(cd ui && npm install) || { echo "npm install failed in ui"; exit 1; }
-
 # update the bids submodule
 git submodule update --init --recursive
 
-# The main differences between the production and development docker-compose files are that the production
-# files uses https via nginx and the development file uses http.
-if [[ $BRAINLIFE_PRODUCTION == true ]]; then
-  DOCKER_COMPOSE_FILE=docker-compose-production.yml
+# The main differences between the docker-compose-nginx.yml and  docker-compose.yml files 
+# are that the nginx file uses https via nginx and while the other file uses http.
+# and serves this application at localhost:3000. If you don't need to reach ezBIDS
+# from outside of the computer it's hosted on, you don't need nginx.
+if [[ $BRAINLIFE_USE_NGINX == true ]]; then
+  DOCKER_COMPOSE_FILE=docker-compose-nginx.yml
 else
   DOCKER_COMPOSE_FILE=docker-compose.yml
 fi
 
-mkdir -p /tmp/upload
-mkdir -p /tmp/workdir
-
-#npm run prepare-husky
+if [[ ${EZBIDS_TMP_DIR} ]]; then
+  # set working dir to the temp dir specified in above variable
+  EZBIDS_WORKING_DIR=${EZBIDS_TMP_DIR}
+  # check to see if it exists
+else:
+  EZBIDS_WORKING_DIR=/tmp/ezbids-workdir/
+    mkdir ${EZBIDS_TMP_DIR}
+fi
+if [ ! -d ${EZBIDS_WORKING_DIR} ]; then
+  mkdir ${EZBIDS_WORKING_DIR}
+fi
 
 ./generate_keys.sh
 

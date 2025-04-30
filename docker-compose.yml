@@ -25,8 +25,7 @@ services:
         build: .
         platform: linux/amd64
         volumes:
-            - ./api:/app/api
-            - /tmp:/tmp
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
         depends_on:
             mongodb:
                 condition: service_healthy
@@ -45,11 +44,12 @@ services:
 
     handler:
         container_name: brainlife_ezbids-handler
-        build: ./handler
+        build:
+            context: .
+            dockerfile: handler/Dockerfile
         platform: linux/amd64
         volumes:
-            - .:/app
-            - /tmp:/tmp
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
         depends_on:
             mongodb:
                 condition: service_healthy
@@ -68,8 +68,6 @@ services:
             - .env
         build: ./ui
         platform: linux/amd64
-        volumes:
-            - ./ui/src:/ui/src #don't copy node_modules which might be compiled for mac (vite won't work)
         environment:
             VITE_APIHOST: http://localhost:8082
             VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION}

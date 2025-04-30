@@ -30,10 +30,9 @@ mv sslcert.cert nginx/ssl/
 cat <<EOL > .env
 SERVER_NAME=$HOSTNAME
 
-# set this to either nginx/production_nginx.conf  or nginx/development_nginx.conf
 NGINX_CONFIG_FILE=nginx/production_nginx.conf
 
-BRAINLIFE_PRODUCTION=true
+BRAINLIFE_USE_NGINX=true
 
 # Set the BRAINLIFE_AUTHENTICATION environment variable to true, if you're not running
 # this with brainlife don't use.
