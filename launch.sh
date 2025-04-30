@@ -47,10 +47,12 @@ fi
 # update the bids submodule
 git submodule update --init --recursive
 
-# The main differences between the production and development docker-compose files are that the production
-# files uses https via nginx and the development file uses http.
-if [[ $BRAINLIFE_PRODUCTION == true ]]; then
-  DOCKER_COMPOSE_FILE=docker-compose-production.yml
+# The main differences between the docker-compose-nginx.yml and  docker-compose.yml files 
+# are that the nginx file uses https via nginx and while the other file uses http.
+# and serves this application at localhost:3000. If you don't need to reach ezBIDS
+# from outside of the computer it's hosted on, you don't need nginx.
+if [[ $BRAINLIFE_USE_NGINX == true ]]; then
+  DOCKER_COMPOSE_FILE=docker-compose-nginx.yml
 else
   DOCKER_COMPOSE_FILE=docker-compose.yml
 fi
