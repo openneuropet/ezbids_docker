@@ -25,7 +25,7 @@ services:
         build: .
         platform: linux/amd64
         volumes:
-            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir/}:/tmp
         depends_on:
             mongodb:
                 condition: service_healthy
@@ -36,7 +36,7 @@ services:
             ./dev.sh
         environment:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
-            BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION}
+            BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
         ports:
             - 8082:8082 #localhost runs on local browser to it needs to access api via host port
         networks:
@@ -57,6 +57,7 @@ services:
                 condition: service_healthy
         environment:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
+            PRESORT: ${PRESORT:-false}
         networks:
             - ezbids
         tty: true #turn on color for bids-validator output
@@ -64,13 +65,11 @@ services:
 
     ui:
         container_name: brainlife_ezbids-ui
-        env_file:
-            - .env
         build: ./ui
         platform: linux/amd64
         environment:
-            VITE_APIHOST: http://localhost:8082
-            VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION}
+            VITE_APIHOST: http://${SERVER_NAME:-localhost}:8082
+            VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:3000"]
         ports:

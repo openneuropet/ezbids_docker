@@ -74,7 +74,10 @@ COPY . /app
 # Install everything in the API folder as well
 WORKDIR /app/api
 RUN cp /app/package.json /app/api/ && npm install
+RUN npx tsc
 
 # install source code from local
 WORKDIR /app/handler
 RUN npm -g install pm2
+RUN npm install
+RUN npx tsc
