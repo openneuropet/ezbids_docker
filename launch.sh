@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# This is the main entry point launching a local/on premises install of ezBIDS.
+# Environment variables are loaded from the .env file, then either an SSL HTTPS
+# Nginx routed version of ezBIDS is launched or a plain "development" version using
+# docker's built in network. It's recommended to use the HTTPS version as browsers 
+# are getting more and more particular about CORS (Cross Origin Requests).
+
+# If this setup is being run locally and does not require an SSL certificate signed
+# by an external authority one can run `create_self_signed_certs.sh` before this 
+# script to automatically generate and locate those certificates into the nginx/ssl/ 
+# folder.
+
 # check to see if a .env file exists
 if [ -f .env ]; then
     echo ".env file exists, loading environment variables from .env file"
@@ -33,28 +44,28 @@ else
   set -e
 fi
 
-# build local changes and mount them directly into the containers
-# api/ and ui/ are mounted as volumes  at /app within the docker-compose.yml
-(cd api && npm install)
-(cd ui && npm install)
-
 # update the bids submodule
 git submodule update --init --recursive
 
-# The main differences between the production and development docker-compose files are that the production
-# files uses https via nginx and the development file uses http.
-if [[ $BRAINLIFE_PRODUCTION == true ]]; then
-  DOCKER_COMPOSE_FILE=docker-compose-production.yml
+# The main differences between the docker-compose-nginx.yml and  docker-compose.yml files 
+# are that the nginx file uses https via nginx and while the other file uses http.
+# and serves this application at localhost:3000. If you don't need to reach ezBIDS
+# from outside of the computer it's hosted on, you don't need nginx.
+if [[ $BRAINLIFE_USE_NGINX == true ]]; then
+  DOCKER_COMPOSE_FILE=docker-compose-nginx.yml
 else
   DOCKER_COMPOSE_FILE=docker-compose.yml
 fi
 
-mkdir -p /tmp/upload
-mkdir -p /tmp/workdir
-
-#npm run prepare-husky
-
-./generate_keys.sh
+# Create the working directory if it doesn't exist
+if [[ ${EZBIDS_TMP_DIR} ]]; then
+  # set working dir to the temp dir specified in above variable
+  # check to see if it exists
+  mkdir -p ${EZBIDS_TMP_DIR}
+else
+  EZBIDS_TMP_DIR=/tmp/ezbids-workdir/
+  mkdir -p ${EZBIDS_TMP_DIR}
+fi
 
 # ok docker compose is now included in docker as an option for docker
 if [[ $(command -v docker-compose) ]]; then 

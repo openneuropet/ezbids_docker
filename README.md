@@ -31,7 +31,123 @@ Users do not need to organize their uploaded data in any specific manner, and us
 
 Should users feel the need to anonymize data before uploading, we strongly recommend that subjects (and sessions, if applicable) be organized into subject (and session) folders, with explicit labeling of the preferred subjects (and sessions) IDs (e.g. `MRI_data/sub-01/ses-01/DICOMS`). Failure to do so for non-anonymized data may result in an inaccurate *first guess* and require additional edits in the web browser.
 
-If users wish to install ezBIDS locally, to ensure that data do not leave their institution site, please see [here](https://brainlife.io/docs/using_ezBIDS/#installing-ezbids-locally).
+#### Local Usage
+
+There are two methods for deploying this service one for local use and another using nginx for sitewide deployments.
+
+For users that can are not setting this service up for others it's recommended to run without nginx.
+
+In either case, the initial setup requires configuring the local environment via
+a `.env` file. The first steps are to copy the `example.env` file in this repo 
+to `.env`:
+
+```bash
+cd ezbids_docker
+cp example.env .env
+```
+The env file you've created should look something like the following:
+
+<details>
+
+
+```bash
+# Create/Copy this file as .env in the root of the project to set default environment variables
+
+# insert your host name here, it should match your ssl certificate and/or the output
+# of echo $HOSTNAME
+SERVER_NAME=localhost
+
+# Set the BRAINLIFE_USE_NGINX environment variable to true to use https"
+# (this will launch the services on port 443) and run with nginx/production_nginx.conf"
+# this will require providing the correct paths for the SSL_CERT_PATH, SSL_KEY_PATH and SSL_PASSWORD_PATH
+# with false the UI will run on 3000"
+BRAINLIFE_USE_NGINX=false
+
+SSL_CERT_PATH=./nginx/ssl/sslcert.cert
+SSL_KEY_PATH=./nginx/ssl/sslcert.key
+SSL_PASSWORD_PATH=./nginx/ssl/sslpassword #if your key is not encrypted use an arbitrary path here
+
+# Set the BRAINLIFE_AUTHENTICATION environment variable to true, if you're not running"
+# this with brainlife don't use."
+BRAINLIFE_AUTHENTICATION=false
+
+# Set the BRAINLIFE_DEVELOPMENT enables additional debugging output and mounts 
+# the ezbids repo/folder into the various containers default is false"
+BRAINLIFE_DEVELOPMENT=false
+
+# Define which profiles to use, e.g. set to COMPOSE_PROFILES=telemetry to enable telemetry 
+COMPOSE_PROFILES=
+
+# Choose whether to pre-sort flat folders full of dicoms, if enabled ezBIDS will attempt
+# to organize a flat folder of dicoms into sub-< indexed subject number > and if applicable
+# ses-< indexed session number> folders.
+PRESORT=false
+
+# can set a custom workingdir/temp dir all uploaded files and work will be performed in
+# this directory, defaults to /tmp in the docker compose file if it's not set here.
+EZBIDS_TMP_DIR=
+```
+
+</details>
+
+#### Environment Variable Details
+
+- `BRAINLIFE_AUTHENTICATION`: This version of ezBIDS has only been tested without user authentication. You will want to keep this value set to false.
+- `PRESORT`: Enable this option if your data is a flat folder full of dicoms, otherwise it's best to organize your such that a single scan/session/modality is contained in it's own folder. In order to extract the necessary PET metadata (information from spreadsheets) this variable should be disabled with `false`
+- `EZBIDS_TMP_DIR`: By default ezBIDS will write data to `/tmp/ezbids-workdir`, you can change that default path by providing a different path here.
+- `BRAINLIFE_USE_NGINX`: Enable with `true` if you want to host this service to multiple clients. Nginx requires ssl certificates to function, you have the option of
+generating self signed or providing certificates from a registered authority.
+- `SERVER_NAME`: Defaults to local host, if using Nginx then set this to the host name matching the server/ssl certificate.
+
+
+#### Nginx Setup
+
+There are some additional steps required for running this service with nginx and https, namely providing ssl certificates. To create self signed certificates run the 
+`create_self_signed_certs.sh` script and provide the hostname/ipaddress of the host
+as the first argument. This will create all of the certificates you need and locate
+them in the `nginx/ssl/` folder. If you want to provide your own certificates place 
+them manually in the `nginx/ssl/` folder and rename them to follow this convention:
+
+`sslcert.cert`, `sslcert.key`, and if your certificate is encrypted provide the password file as `sslpassword`.
+
+The Nginx folder exists solely to hold certs and configuration files:
+
+```bash
+tree nginx/
+nginx/
+├── production_nginx.conf
+└── ssl
+    ├── sslpassword # optional file
+    ├── sslcert.cert
+    └── sslcert.key
+
+2 directories, 3 files
+```
+
+If you're using a password make sure to uncomment the line in the nginx config file (`nginx/production_nginx.conf`) for that password file.
+
+```nginx
+server {
+    listen 443 ssl;
+    ssl_certificate /etc/nginx/conf.d/ssl/sslcert.cert;
+    ssl_certificate_key /etc/nginx/conf.d/ssl/sslcert.key;
+    # password file is optional, un-comment and generate/rename your file if required
+    #ssl_password_file /etc/nginx/conf.d/ssl/sslpassword;
+    server_name  $SERVER_NAME;
+    client_max_body_size 1200M;
+}
+```
+
+Once you've completed your configuring, you can start the application with the `launch.sh` script. It will export the variables set in the `.env` file to your environment and based on your choices launch ezBIDS at `localhost:3000` or `https://yourhostname/`
+
+If you're switching between nginx or the localhost option make sure to rebuild the
+containers with:
+
+```
+docker compose build -f docker-compose.yml (or docker-compose-nginx.yml) --build --no-cache
+```
+Using `--no-cache` might slow things down, but it's a way to ensure you don't run into issues with "stale" containers. The `--parallel` flag can speed things up as it
+will build multiple containers at once.
 
 ### Authors
 
