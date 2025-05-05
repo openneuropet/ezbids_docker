@@ -9,7 +9,8 @@ from presort_dicoms import presort
 # presort can slow down ezBIDS as it examines every dicom, it's enabled/disabled
 # by setting the PRESORT environment varibable to "true" or ""
 presort_enabled = bool(os.getenv('PRESORT', 'false').lower() == 'true')
-presort_enabled_pet = bool(os.getenv('PREESORT_PET', 'false').lower == 'true')
+presort_enabled_pet = bool(os.getenv('PRESORT_PET', 'false').lower() == 'true')
+
 
 # if pet2bids is installed we use it wherever the PET data live
 try:

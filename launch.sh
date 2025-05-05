@@ -57,19 +57,16 @@ else
   DOCKER_COMPOSE_FILE=docker-compose.yml
 fi
 
+# Create the working directory if it doesn't exist
 if [[ ${EZBIDS_TMP_DIR} ]]; then
   # set working dir to the temp dir specified in above variable
-  EZBIDS_WORKING_DIR=${EZBIDS_TMP_DIR}
   # check to see if it exists
-else:
-  EZBIDS_WORKING_DIR=/tmp/ezbids-workdir/
-    mkdir ${EZBIDS_TMP_DIR}
-fi
-if [ ! -d ${EZBIDS_WORKING_DIR} ]; then
-  mkdir ${EZBIDS_WORKING_DIR}
+  mkdir -p ${EZBIDS_TMP_DIR}
+else
+  EZBIDS_TMP_DIR=/tmp/ezbids-workdir/
+  mkdir -p ${EZBIDS_TMP_DIR}
 fi
 
-./generate_keys.sh
 
 # ok docker compose is now included in docker as an option for docker
 if [[ $(command -v docker-compose) ]]; then 

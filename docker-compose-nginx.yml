@@ -33,13 +33,15 @@ services:
             ./dev.sh
         environment:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
-            BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION}
+            BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
         networks:
             - ezbids
 
     handler:
         container_name: brainlife_ezbids-handler
-        build: ./handler
+        build:
+            context: .
+            dockerfile: handler/Dockerfile
         platform: linux/amd64
         volumes:
             - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
@@ -50,23 +52,26 @@ services:
                 condition: service_healthy
         environment:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
-            PRESORT: ${PRESORT}
+            PRESORT: ${PRESORT:-false}
         networks:
             - ezbids
         tty: true #turn on color for bids-validator output
         command: pm2 start handler.js --attach
 
     ui:
+        # we only run this container to build the UI pages to mount into a volume
+        # for use in the nginx container.
         container_name: brainlife_ezbids-ui-builder
-        env_file:
-            - .env
         build: 
             context: ./ui/
             dockerfile: Dockerfile-production
         platform: linux/amd64
         environment:
             VITE_APIHOST: https://${SERVER_NAME}/api
-            VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION}
+            VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
+        volumes:
+            - ui_dist:/ui/dist
+        command: tail -f /dev/null # Keep container running
 
     # by default this is not enabled, add COMPOSE_PROFILES=telemetry to your .env
     telemetry:
@@ -80,8 +85,6 @@ services:
             - ezbids
 
     nginx:
-        env_file:
-            - .env
         container_name: brainlife_ezbids-nginx
         depends_on:
             - ui
@@ -93,6 +96,13 @@ services:
         networks:
             - ezbids
         volumes:
+            # we do mount ssl certs and the built portions of the ui pages
+            # in this docker compose versus the locally hosted one. The ssl mounts
+            # are a necessity, while the ui_dist mount enables us to eliminate 1
+            # container since we're serving the page with nginx.
             - ./nginx/ssl/:/etc/nginx/conf.d/ssl/
             - ./nginx/production_nginx.conf:/etc/nginx/conf.d/default.conf
-            - ./ui/dist:/usr/share/nginx/html/ezbids:ro
+            - ui_dist:/usr/share/nginx/html/ezbids:ro
+
+volumes:
+    ui_dist:
