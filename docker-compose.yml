@@ -25,7 +25,7 @@ services:
         build: .
         platform: linux/amd64
         volumes:
-            - ${EZBIDS_TMP_DIR:-/tmp/ezbid-workdir/}:/tmp
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir/}:/tmp
         depends_on:
             mongodb:
                 condition: service_healthy
