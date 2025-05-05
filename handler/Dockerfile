@@ -1,6 +1,5 @@
 FROM neurodebian:nd20.04-non-free
 
-
 SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND noninteractive
