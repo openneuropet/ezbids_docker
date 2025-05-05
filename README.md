@@ -124,7 +124,7 @@ nginx/
 2 directories, 3 files
 ```
 
-If you're using a password make sure to uncomment the line in the ngnix config file (`nginx/production_nginx.conf`) for that password file.
+If you're using a password make sure to uncomment the line in the nginx config file (`nginx/production_nginx.conf`) for that password file.
 
 ```nginx
 server {
@@ -138,7 +138,7 @@ server {
 }
 ```
 
-Once you've completed your configuring, you can start the application with the `launch.sh` script. It will export the variables set in the `.env` file to your enviroment and based on your choices launch ezBIDS at `localhost:3000` or `https://yourhostname/`
+Once you've completed your configuring, you can start the application with the `launch.sh` script. It will export the variables set in the `.env` file to your environment and based on your choices launch ezBIDS at `localhost:3000` or `https://yourhostname/`
 
 If you're switching between nginx or the localhost option make sure to rebuild the
 containers with:

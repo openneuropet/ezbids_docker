@@ -2,7 +2,7 @@
 
 # This is the main entry point launching a local/on premises install of ezBIDS.
 # Environment variables are loaded from the .env file, then either an SSL HTTPS
-# Nginx routed version of ezBIDS is launched or a plain "develoment" version using
+# Nginx routed version of ezBIDS is launched or a plain "development" version using
 # docker's built in network. It's recommended to use the HTTPS version as browsers 
 # are getting more and more particular about CORS (Cross Origin Requests).
 
