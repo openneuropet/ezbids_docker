@@ -19,9 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Pull MongoDB
-        run: docker pull mongo:4.4.15
-
       - name: Build services
         run: docker compose -f ${{ env.COMPOSE_FILE }} build
 
@@ -33,7 +30,7 @@ jobs:
           docker save ezbids_docker-api:latest > api-nginx.tar
           docker save ezbids_docker-handler:latest > handler-nginx.tar
           docker save ezbids_docker-ui:latest > ui-nginx.tar
-          docker save ezbids_docker-nginx:latest > nginx.tar
+          docker save nginx:latest > nginx.tar
           
           # Upload as artifacts
           echo "images=mongo.tar,api-nginx.tar,handler-nginx.tar,ui-nginx.tar,nginx.tar" >> $GITHUB_OUTPUT

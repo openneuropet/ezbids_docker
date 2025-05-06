@@ -19,9 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Pull MongoDB
-        run: docker pull mongo:4.4.15
-
       - name: Build services
         run: docker compose -f ${{ env.COMPOSE_FILE }} build
 
