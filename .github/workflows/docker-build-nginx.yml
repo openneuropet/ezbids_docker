@@ -25,50 +25,21 @@ jobs:
       - name: Pull MongoDB
         run: docker pull mongo:4.4.15
 
-      - name: Build API
-        uses: docker/build-push-action@v5
+      - name: Build services
+        uses: docker/compose-action@v3
         with:
-          context: .
-          file: ${{ env.COMPOSE_FILE }}
-          target: api
-          load: true
-          tags: ezbids-api-nginx:test
-
-      - name: Build Handler
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ env.COMPOSE_FILE }}
-          target: handler
-          load: true
-          tags: ezbids-handler-nginx:test
-
-      - name: Build UI
-        uses: docker/build-push-action@v5
-        with:
-          context: ./ui
-          file: ./ui/Dockerfile-nginx
-          load: true
-          tags: ezbids-ui-nginx:test
-
-      - name: Build Nginx
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ env.COMPOSE_FILE }}
-          target: nginx
-          load: true
-          tags: ezbids-nginx:test
+          compose-file: ${{ env.COMPOSE_FILE }}
+          build: true
 
       - name: Save images
         id: save-images
         run: |
           # Save images to tar files
           docker save mongo:4.4.15 > mongo.tar
-          docker save ezbids-api-nginx:test > api-nginx.tar
-          docker save ezbids-handler-nginx:test > handler-nginx.tar
-          docker save ezbids-ui-nginx:test > ui-nginx.tar
-          docker save ezbids-nginx:test > nginx.tar
+          docker save ezbids_docker-api:latest > api-nginx.tar
+          docker save ezbids_docker-handler:latest > handler-nginx.tar
+          docker save ezbids_docker-ui:latest > ui-nginx.tar
+          docker save ezbids_docker-nginx:latest > nginx.tar
           
           # Upload as artifacts
           echo "images=mongo.tar,api-nginx.tar,handler-nginx.tar,ui-nginx.tar,nginx.tar" >> $GITHUB_OUTPUT

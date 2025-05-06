@@ -25,41 +25,20 @@ jobs:
       - name: Pull MongoDB
         run: docker pull mongo:4.4.15
 
-      - name: Build API
-        uses: docker/build-push-action@v5
+      - name: Build services
+        uses: docker/compose-action@v3
         with:
-          context: .
-          file: ${{ env.COMPOSE_FILE }}
-          target: api
-          load: true
-          tags: ezbids-api:test
-
-      - name: Build Handler
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ env.COMPOSE_FILE }}
-          target: handler
-          load: true
-          tags: ezbids-handler:test
-
-      - name: Build UI
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ env.COMPOSE_FILE }}
-          target: ui
-          load: true
-          tags: ezbids-ui:test
+          compose-file: ${{ env.COMPOSE_FILE }}
+          build: true
 
       - name: Save images
         id: save-images
         run: |
           # Save images to tar files
           docker save mongo:4.4.15 > mongo.tar
-          docker save ezbids-api:test > api.tar
-          docker save ezbids-handler:test > handler.tar
-          docker save ezbids-ui:test > ui.tar
+          docker save ezbids_docker-api:latest > api.tar
+          docker save ezbids_docker-handler:latest > handler.tar
+          docker save ezbids_docker-ui:latest > ui.tar
           
           # Upload as artifacts
           echo "images=mongo.tar,api.tar,handler.tar,ui.tar" >> $GITHUB_OUTPUT
