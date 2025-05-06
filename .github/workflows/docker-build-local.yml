@@ -24,6 +24,9 @@ jobs:
         id: repo
         run: echo "REPO_NAME=$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
 
+      - name: Pull required images
+        run: docker compose -f ${{ env.COMPOSE_FILE }} pull
+
       - name: Build services
         run: docker compose -f ${{ env.COMPOSE_FILE }} build
 
