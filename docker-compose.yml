@@ -65,8 +65,6 @@ services:
 
     ui:
         container_name: brainlife_ezbids-ui
-        env_file:
-            - .env
         build: ./ui
         platform: linux/amd64
         environment:

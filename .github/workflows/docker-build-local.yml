@@ -1,0 +1,57 @@
+name: Docker Build (Local)
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  COMPOSE_FILE: ./docker-compose.yml
+  REGISTRY_PREFIX: docker.io/library
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.save-images.outputs.images }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set repository name
+        id: repo
+        run: echo "REPO_NAME=$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
+
+      - name: Pull required images
+        run: docker compose -f ${{ env.COMPOSE_FILE }} pull
+
+      - name: Build services
+        run: docker compose -f ${{ env.COMPOSE_FILE }} build
+
+      - name: Save images
+        id: save-images
+        run: |
+          # Save images to tar files
+          docker save mongo > mongo.tar
+          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest > api.tar
+          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest > handler.tar
+          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui.tar
+          
+          # Upload as artifacts
+          echo "images=mongo.tar,api.tar,handler.tar,ui.tar" >> $GITHUB_OUTPUT
+          
+      - name: Upload images
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images-local
+          path: |
+            mongo.tar
+            api.tar
+            handler.tar
+            ui.tar
+          retention-days: 1
+
+      - name: Clean up
+        run: docker system prune -f 
