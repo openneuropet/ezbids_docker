@@ -1,0 +1,89 @@
+name: Docker Build (Nginx)
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  COMPOSE_FILE: ./docker-compose-nginx.yml
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.save-images.outputs.images }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Pull MongoDB
+        run: docker pull mongo:4.4.15
+
+      - name: Build API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.COMPOSE_FILE }}
+          target: api
+          load: true
+          tags: ezbids-api-nginx:test
+
+      - name: Build Handler
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.COMPOSE_FILE }}
+          target: handler
+          load: true
+          tags: ezbids-handler-nginx:test
+
+      - name: Build UI
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ui
+          file: ./ui/Dockerfile-nginx
+          load: true
+          tags: ezbids-ui-nginx:test
+
+      - name: Build Nginx
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.COMPOSE_FILE }}
+          target: nginx
+          load: true
+          tags: ezbids-nginx:test
+
+      - name: Save images
+        id: save-images
+        run: |
+          # Save images to tar files
+          docker save mongo:4.4.15 > mongo.tar
+          docker save ezbids-api-nginx:test > api-nginx.tar
+          docker save ezbids-handler-nginx:test > handler-nginx.tar
+          docker save ezbids-ui-nginx:test > ui-nginx.tar
+          docker save ezbids-nginx:test > nginx.tar
+          
+          # Upload as artifacts
+          echo "images=mongo.tar,api-nginx.tar,handler-nginx.tar,ui-nginx.tar,nginx.tar" >> $GITHUB_OUTPUT
+          
+      - name: Upload images
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images-nginx
+          path: |
+            mongo.tar
+            api-nginx.tar
+            handler-nginx.tar
+            ui-nginx.tar
+            nginx.tar
+          retention-days: 1
+
+      - name: Clean up
+        run: docker system prune -f 
