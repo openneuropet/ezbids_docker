@@ -1,9 +1,9 @@
+[![Docker Build (Local)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-local.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-local.yml)
+[![Docker Build (Nginx)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-nginx.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-nginx.yml)
+
 # ezBIDS
 
 The secure, cloud-based service for the semi-automated mapping of entire sessions of neuroimaging data to the Brain Imaging Data Structure ([BIDS](https://bids.neuroimaging.io/)) standard.  
-
-[![Docker Build (Local)](https://github.com/brainlife/ezbids/actions/workflows/docker-build-local.yml/badge.svg)](https://github.com/brainlife/ezbids/actions/workflows/docker-build-local.yml)
-[![Docker Build (Nginx)](https://github.com/brainlife/ezbids/actions/workflows/docker-build-nginx.yml/badge.svg)](https://github.com/brainlife/ezbids/actions/workflows/docker-build-nginx.yml)
 
 <img width="1450" alt="Screenshot 2023-11-01 at 11 50 48 AM" src="https://github.com/brainlife/ezbids/assets/2119795/2c054297-1503-4ebb-8718-336012c80b48">
 
