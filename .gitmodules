@@ -2,3 +2,12 @@
 	path = bids-specification
 	url = https://github.com/bids-standard/bids-specification
 	branch = master
+[submodule "test/test_data/dcm_qa_nih"]
+	path = test/test_data/dcm_qa_nih
+	url = https://github.com/neurolabusc/dcm_qa_nih.git
+[submodule "test/test_data/dcm_qa_uih"]
+	path = test/test_data/dcm_qa_uih
+	url = https://github.com/neurolabusc/dcm_qa_uih.git
+[submodule "test/test_data/petdicoms"]
+	path = test/test_data/petdicoms
+	url = https://github.com/openneuropet/petdicoms.git
