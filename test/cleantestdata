@@ -1,0 +1,13 @@
+#! /usr/bin/env bash
+# cleans up the testdata we have in this folder
+
+git submodule deinit -f test/test_data/dcm_qa_nih
+git submodule deinit -f test/test_data/dcm_qa_uih
+git submodule deinit -f test/test_data/petdicoms
+git rm -f test/test_data/dcm_qa_nih
+git rm -f test/test_data/dcm_qa_uih
+git rm -f test/test_data/petdicoms
+rm -rf .git/modules/test/test_data/dcm_qa_uih
+rm -rf .git/modules/test/test_data/dcm_qa_nih
+rm -rf .git/modules/test/test_data/petdicoms
+rm -rf test/test_data

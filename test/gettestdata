@@ -1,0 +1,27 @@
+#! /usr/bin/env bash
+
+if [ ! -d "test/test_data/dcm_qa_nih" ]; then
+	git submodule add --force https://github.com/neurolabusc/dcm_qa_nih.git test/test_data/dcm_qa_nih
+fi
+if [ ! -d "test/test_data/dcm_qa_uih" ]; then
+	git submodule add --force https://github.com/neurolabusc/dcm_qa_uih.git test/test_data/dcm_qa_uih
+fi
+if [ ! -d "test/test_data/petdicoms" ]; then
+	git submodule add --force https://github.com/openneuropet/petdicoms.git test/test_data/petdicoms
+fi
+git submodule update --init test/test_data/dcm_qa_nih
+git submodule update --init test/test_data/dcm_qa_uih
+git submodule update --init test/test_data/petdicoms
+# Prevent accidental commits to submodules
+git config submodule.test/test_data/dcm_qa_nih.ignore dirty
+git config submodule.test/test_data/dcm_qa_uih.ignore dirty
+git config submodule.test/test_data/petdicoms.ignore dirty
+# Unzip petdicoms data
+echo "Unzipping petdicoms data..."
+cd test/test_data/petdicoms/sourcedata || exit 1
+for zip in *.zip; do
+	if [ -f "$zip" ]; then
+		echo "Unzipping $zip..."
+		unzip -q -o "$zip" -d "${zip%.zip}"
+	fi
+done
