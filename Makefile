@@ -7,6 +7,7 @@ test/test_data:
 # Initialize and update submodules for test data
 get-test-data: test/test_data
 	test/gettestdata
+	test/createmixedfolder
 
 # Clean test data (remove submodules and their directories)
 clean-testdata:
