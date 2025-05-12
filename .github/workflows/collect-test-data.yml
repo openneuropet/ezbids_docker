@@ -30,7 +30,6 @@ jobs:
       - name: Get test data if not cached
         if: steps.test-data-cache.outputs.cache-hit != 'true'
         run: |
-          cd test
           make get-test-data
 
       - name: Verify test data
