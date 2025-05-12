@@ -38,7 +38,7 @@ jobs:
             echo "Test data directory not found"
             exit 1
           fi
-          if [ ! -d "test/test_data/mixed_dicom" ]; then
+          if [ ! -d "test/test_data/mixed_dicoms" ]; then
             echo "Mixed DICOM directory not found"
             exit 1
           fi
