@@ -1,0 +1,50 @@
+name: Collect Test Data
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  collect-data:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.test-data-cache.outputs.cache-hit }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true  # Ensure we get the submodule info
+
+      - name: Cache test data
+        uses: actions/cache@v4
+        id: test-data-cache
+        with:
+          path: test/test_data
+          key: test-data-${{ hashFiles('.gitmodules') }}
+          restore-keys: |
+            test-data-
+
+      - name: Get test data if not cached
+        if: steps.test-data-cache.outputs.cache-hit != 'true'
+        run: |
+          make get-test-data
+
+      - name: Verify test data
+        run: |
+          if [ ! -d "test/test_data" ]; then
+            echo "Test data directory not found"
+            exit 1
+          fi
+          if [ ! -d "test/test_data/mixed_dicoms" ]; then
+            echo "Mixed DICOM directory not found"
+            exit 1
+          fi
+
+      - name: Upload test data
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-data
+          path: test/test_data 

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+# Check if test data exists, if not run gettestdata
+if [ ! -d "test/test_data/dcm_qa_nih" ] || [ ! -d "test/test_data/dcm_qa_uih" ] || [ ! -d "test/test_data/petdicoms" ]; then
+    echo "Test data not found. Running gettestdata..."
+    make gettestdata
+fi
+
+# Create mixed folder if it doesn't exist
+MIXED_FOLDER="test/test_data/mixed_dicoms"
+mkdir -p "$MIXED_FOLDER"
+
+# Function to copy DICOM files from a directory
+copy_dicoms() {
+    local source_dir="$1"
+    local target_dir="$2"
+    echo "Copying DICOM files from $source_dir..."
+    
+    # Find all DICOM files (case insensitive) and copy them
+    find "$source_dir" -type f \( -iname "*.dcm" -o -iname "*.ima" -o -iname "*.img" \) -exec cp {} "$target_dir" \;
+}
+
+# Copy DICOM files from dcm_qa_nih
+copy_dicoms "test/test_data/dcm_qa_nih" "$MIXED_FOLDER"
+
+# Copy DICOM files from dcm_qa_uih
+copy_dicoms "test/test_data/dcm_qa_uih" "$MIXED_FOLDER"
+
+# Copy DICOM files from petdicoms (excluding zip files)
+echo "Copying DICOM files from petdicoms..."
+find "test/test_data/petdicoms" -type f \( -iname "*.dcm" -o -iname "*.ima" -o -iname "*.img" \) -not -path "*.zip" -exec cp {} "$MIXED_FOLDER" \;
+
+# Count the number of files copied
+file_count=$(find "$MIXED_FOLDER" -type f | wc -l)
+echo "Created mixed folder with $file_count DICOM files at $MIXED_FOLDER"

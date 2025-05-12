@@ -1,0 +1,97 @@
+name: Test Local Upload
+
+on:
+  workflow_run:
+    workflows: ["Docker Build (Local)"]
+    types:
+      - completed
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    env:
+      COMPOSE_FILE: ./docker-compose.yml
+      REGISTRY_PREFIX: docker.io/library
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true  # Ensure we get the submodule info
+
+      - name: Set repository name
+        run: echo "REPO_NAME=$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
+
+      - name: Cache test data
+        uses: actions/cache@v4
+        id: test-data-cache
+        with:
+          path: test/test_data
+          key: test-data-${{ hashFiles('.gitmodules') }}
+          restore-keys: |
+            test-data-
+
+      - name: Get test data if not cached
+        if: steps.test-data-cache.outputs.cache-hit != 'true'
+        run: |
+          cd test
+          make gettestdata
+
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images-local
+          path: .
+
+      - name: Load images
+        run: |
+          docker load < mongo.tar
+          docker load < api.tar
+          docker load < handler.tar
+          docker load < ui.tar
+
+      - name: Tag images
+        run: |
+          docker tag mongo:latest mongo:test
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest ${REPO_NAME}-api:test
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest ${REPO_NAME}-handler:test
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ${REPO_NAME}-ui:test
+
+      - name: Start services
+        run: docker compose -f ${{ env.COMPOSE_FILE }} up -d
+
+      - name: Wait for services to be ready
+        run: |
+          # Wait for MongoDB
+          timeout 60 bash -c 'until docker compose -f ${{ env.COMPOSE_FILE }} exec -T mongo mongosh --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; do sleep 2; done'
+          
+          # Wait for API
+          timeout 60 bash -c 'until curl -s http://localhost:8082/health > /dev/null; do sleep 2; done'
+          
+          # Wait for UI
+          timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 2; done'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Verify uv installation
+        run: uv --version
+
+      - name: Setup test environment
+        run: |
+          cd test
+          make setup-test
+
+      - name: Run upload test
+        run: |
+          cd test
+          make test-upload
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f ${{ env.COMPOSE_FILE }} down
+          docker system prune -f 

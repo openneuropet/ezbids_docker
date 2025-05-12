@@ -10,4 +10,5 @@ git rm -f test/test_data/petdicoms
 rm -rf .git/modules/test/test_data/dcm_qa_uih
 rm -rf .git/modules/test/test_data/dcm_qa_nih
 rm -rf .git/modules/test/test_data/petdicoms
+rm -rf test/test_data/mixed_dicoms
 rm -rf test/test_data

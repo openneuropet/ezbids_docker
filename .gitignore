@@ -42,5 +42,5 @@ nginx/ssl/*
 *__pycache__*
 
 # Ignore test data submodules contents but not the submodule tracking
-# test/test_data/*/
-# !test/test_data/.gitkeep
+test/test_data/*/
+!test/test_data/.gitkeep
