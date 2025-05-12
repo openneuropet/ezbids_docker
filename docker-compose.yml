@@ -13,16 +13,16 @@ services:
             test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
             interval: 10s
             timeout: 10s
-            retries:
-                5
+            retries: 5
         ports:
-            - 27417:27017 #for local debugging
+            - 27417:27017
         networks:
             - ezbids
 
     api:
         container_name: brainlife_ezbids-api
         build: .
+        image: ezbids-api   # <-- explicitly set this
         platform: linux/amd64
         volumes:
             - ./api:/app/api
@@ -39,13 +39,14 @@ services:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
             BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION}
         ports:
-            - 8082:8082 #localhost runs on local browser to it needs to access api via host port
+            - 8082:8082
         networks:
             - ezbids
 
     handler:
         container_name: brainlife_ezbids-handler
         build: ./handler
+        image: ezbids-handler  # <-- explicitly set this
         platform: linux/amd64
         volumes:
             - .:/app
@@ -59,7 +60,7 @@ services:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
         networks:
             - ezbids
-        tty: true #turn on color for bids-validator output
+        tty: true
         command: pm2 start handler.js --attach --watch --ignore-watch "ui **/node_modules"
 
     ui:
@@ -67,30 +68,30 @@ services:
         env_file:
             - .env
         build: ./ui
+        image: ezbids-ui   # <-- explicitly set this
         platform: linux/amd64
         volumes:
-            - ./ui/src:/ui/src #don't copy node_modules which might be compiled for mac (vite won't work)
+            - ./ui/src:/ui/src
         environment:
             VITE_APIHOST: http://localhost:8082
             VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION}
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:3000"]
         ports:
-            - 3000:3000 #vite wants to be exposed on the host for HMR?
+            - 3000:3000
         networks:
             - ezbids
 
-    # by default this is not enabled, need to run docker compose with --profile development to enable this service
     telemetry:
         container_name: brainlife_ezbids-telemetry
         build: ./telemetry
+        image: ezbids-telemetry   # <-- explicitly set this
         platform: linux/amd64
         depends_on:
             - mongodb
         profiles: ["telemetry"]
         ports:
-            - 8000:8000 #for local debugging
+            - 8000:8000
         networks:
             - ezbids
-
 

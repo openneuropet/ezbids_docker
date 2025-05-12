@@ -1,0 +1,1 @@
+FATAL:   While checking container encryption: could not open image /home/martinnorgaard/Documents/GitHub/ezbids/ui.sif: failed to retrieve path for /home/martinnorgaard/Documents/GitHub/ezbids/ui.sif: lstat /home/martinnorgaard/Documents/GitHub/ezbids/ui.sif: no such file or directory

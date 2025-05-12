@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-cd ..
-cd ui/
-npm run dev
+cd ../ui
+npm install
+npm run dev -- --host 0.0.0.0

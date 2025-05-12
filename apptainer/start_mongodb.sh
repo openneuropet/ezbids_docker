@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-mongod --dbpath /data/
+mongod --bind_ip_all --dbpath /data/db

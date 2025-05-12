@@ -1,10 +1,11 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
+set -e
 
-# If we're in production we want to build the ui and allow nginx to serve the files, 
-# otherwise we run npm install which will create a ui page and use vite to serve it
-# in "development" mode
-if [ $BRAINLIFE_PRODUCTION == true ]; then
-  npm run build
-else
-  npm run dev
-fi
+# Explicitly set working directory
+cd /ui
+
+# Explicitly install dependencies (ensure this runs)
+npm install
+
+# Explicitly start the Vite dev server explicitly on all interfaces
+npm run dev -- --host 0.0.0.0

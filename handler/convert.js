@@ -20,7 +20,6 @@ Object.values(bidsEntitiesOrdered).forEach(order => {
 });
 info.entityMappings = newEntityOrdering;
 const datasetName = info.datasetDescription.Name;
-
 mkdirp.sync(root + "/bids/" + datasetName);
 fs.writeFileSync(root + "/bids/" + datasetName + "/finalized.json", JSON.stringify(info, null, 4)); //copy the finalized.json
 fs.writeFileSync(root + "/bids/" + datasetName + "/dataset_description.json", JSON.stringify(info.datasetDescription, null, 4));
@@ -33,7 +32,7 @@ info.readme += `
 
 ## ezbids
 
-This dataset was converted to BIDS using ezBIDS (https://brainlife.io/ezbids)
+This dataset was converted from DICOM to BIDS using ezBIDS (https://brainlife.io/ezbids)
 
 `;
 fs.writeFileSync(root + "/bids/" + datasetName + "/README", info.readme);
@@ -50,20 +49,15 @@ for (let key of keys) {
     tsvheader.push(key);
 }
 tsv.push(tsvheader);
-let subList = [];
 for (const subject_idx in info.participantInfo) {
     const sub = info.subjects[subject_idx];
-    if (!subList.includes(sub.subject)) {
-        subList.push(sub.subject);
-        let tsvrec = [];
-        tsvrec.push("sub-" + sub.subject);
-        for (let key in info.participantsColumn) {
-            tsvrec.push(info.participantInfo[subject_idx][key] || 'n/a');
-        }
-        tsv.push(tsvrec);
+    let tsvrec = [];
+    tsvrec.push("sub-" + sub.subject);
+    for (let key in info.participantsColumn) {
+        tsvrec.push(info.participantInfo[subject_idx][key] || 'n/a');
     }
+    tsv.push(tsvrec);
 }
-console.log('ParticipantsInfo', tsv);
 let tsvf = fs.openSync(root + "/bids/" + datasetName + "/participants.tsv", "w");
 for (let rec of tsv) {
     fs.writeSync(tsvf, rec.join("\t") + "\n");
@@ -149,7 +143,6 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             }
         });
     }
-
     function handlePerf() {
         o.items.forEach(item => {
             let derivatives = null;
@@ -169,8 +162,8 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                                 continue;
                             }
                             //if intended object is excluded, skip it
-                            if (io._type == "exclude") continue;
-
+                            if (io._type == "exclude")
+                                continue;
                             const iomodality = io._type.split("/")[0];
                             const suffix = io._type.split("/")[1];
                             //construct a path relative to the subject
@@ -187,9 +180,6 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                             }
                             path += tokens.join("_");
                             path += "_" + suffix + ".nii.gz"; //TODO - not sure if this is robust enough..
-                            if (info.BIDSURI === true) {
-                                path = "bids::" + "sub-" + io._entities.subject + "/" + path
-                            }
                             item.sidecar.IntendedFor.push(path);
                         }
                     }
@@ -200,7 +190,6 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             }
         });
     }
-
     function handleAnat() {
         /*
         - suffixes:
@@ -239,18 +228,20 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                     break;
                 case "json":
                     //handle B0FieldIdentifier and B0FieldSource if present
-                    if(o.B0FieldIdentifier.length) {
-                        if(o.B0FieldIdentifier.length > 1) {
-                            item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier)
-                        }else{
-                            item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0]
+                    if (o.B0FieldIdentifier) {
+                        if (o.B0FieldIdentifier.length > 1) {
+                            item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier);
+                        }
+                        else {
+                            item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0];
                         }
                     }
-                    if(o.B0FieldSource.length) {
-                        if(o.B0FieldSource.length > 1) {
-                            item.sidecar.B0FieldSource = Object.values(o.B0FieldSource)
-                        }else{
-                            item.sidecar.B0FieldSource = o.B0FieldSource[0]
+                    if (o.B0FieldSource) {
+                        if (o.B0FieldSource.length > 1) {
+                            item.sidecar.B0FieldSource = Object.values(o.B0FieldSource);
+                        }
+                        else {
+                            item.sidecar.B0FieldSource = o.B0FieldSource[0];
                         }
                     }
                     handleItem(item, suffix + ".json", derivatives);
@@ -274,16 +265,16 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             const headers = Object.keys(events.eventsBIDS[0]); //take first index value to see which columns user selected
             events.content = headers.join("\t") + "\n";
             events.eventsBIDS.forEach(rec => {
-                if(rec.stim_file) {
-                    if(!rec.stim_file.startsWith("/stimuli/")) {
-                        rec.stim_file = "/stimuli/" + rec.stim_file
+                if (rec.stim_file) {
+                    if (!rec.stim_file.startsWith("/stimuli/")) {
+                        rec.stim_file = "/stimuli/" + rec.stim_file;
                     }
                 }
                 const row = [];
                 headers.forEach(key => {
                     row.push(rec[key]);
                 });
-                events.content += row.join("\t") + "\n";                
+                events.content += row.join("\t") + "\n";
             });
             //add stuff to sidecar
             const sidecar = o.items.find(o => o.name == "json");
@@ -306,18 +297,20 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                         break;
                     case "json":
                         //handle B0FieldIdentifier and B0FieldSource if present
-                        if(o.B0FieldIdentifier) {
-                            if(o.B0FieldIdentifier.length > 1) {
-                                item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier)
-                            }else{
-                                item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0]
+                        if (o.B0FieldIdentifier.length) {
+                            if (o.B0FieldIdentifier.length > 1) {
+                                item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier);
+                            }
+                            else {
+                                item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0];
                             }
                         }
-                        if(o.B0FieldSource) {
-                            if(o.B0FieldSource.length > 1) {
-                                item.sidecar.B0FieldSource = Object.values(o.B0FieldSource)
-                            }else{
-                                item.sidecar.B0FieldSource = o.B0FieldSource[0]
+                        if (o.B0FieldSource.length) {
+                            if (o.B0FieldSource.length > 1) {
+                                item.sidecar.B0FieldSource = Object.values(o.B0FieldSource);
+                            }
+                            else {
+                                item.sidecar.B0FieldSource = o.B0FieldSource[0];
                             }
                         }
                         item.sidecar.TaskName = o._entities.task;
@@ -347,20 +340,22 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                     break;
                 case "json":
                     //handle B0FieldIdentifier and B0FieldSource if present
-                    if(o.B0FieldIdentifier.length) {
-                        if(o.B0FieldIdentifier.length > 1) {
-                            item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier)
-                        }else{
-                            item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0]
+                    if (o.B0FieldIdentifier.length) {
+                        if (o.B0FieldIdentifier.length > 1) {
+                            item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier);
+                        }
+                        else {
+                            item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0];
                         }
                     }
-                    if(o.B0FieldSource.length) {
-                        if(o.B0FieldSource.length > 1) {
-                            item.sidecar.B0FieldSource = Object.values(o.B0FieldSource)
-                        }else{
-                            item.sidecar.B0FieldSource = o.B0FieldSource[0]
+                    if (o.B0FieldSource.length) {
+                        if (o.B0FieldSource.length > 1) {
+                            item.sidecar.B0FieldSource = Object.values(o.B0FieldSource);
                         }
-                    }                    
+                        else {
+                            item.sidecar.B0FieldSource = o.B0FieldSource[0];
+                        }
+                    }
                     //handle IntendedFor
                     if (o.IntendedFor) {
                         item.sidecar.IntendedFor = [];
@@ -372,8 +367,8 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                                 continue;
                             }
                             //if intended object is excluded, skip it
-                            if (io._type == "exclude") continue;
-
+                            if (io._type == "exclude")
+                                continue;
                             const iomodality = io._type.split("/")[0];
                             const suffix = io._type.split("/")[1];
                             //construct a path relative to the subject
@@ -390,9 +385,6 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                             }
                             path += tokens.join("_");
                             path += "_" + suffix + ".nii.gz"; //TODO - not sure if this is robust enough..
-                            if (info.BIDSURI === true) {
-                                path = "bids::" + "sub-" + io._entities.subject + "/" + path
-                            }
                             item.sidecar.IntendedFor.push(path);
                         }
                     }
@@ -417,18 +409,20 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
                     break;
                 case "json":
                     //handle B0FieldIdentifier and B0FieldSource if present
-                    if(o.B0FieldIdentifier.length) {
-                        if(o.B0FieldIdentifier.length > 1) {
-                            item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier)
-                        }else{
-                            item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0]
+                    if (o.B0FieldIdentifier.length) {
+                        if (o.B0FieldIdentifier.length > 1) {
+                            item.sidecar.B0FieldIdentifier = Object.values(o.B0FieldIdentifier);
+                        }
+                        else {
+                            item.sidecar.B0FieldIdentifier = o.B0FieldIdentifier[0];
                         }
                     }
-                    if(o.B0FieldSource.length) {
-                        if(o.B0FieldSource.length > 1) {
-                            item.sidecar.B0FieldSource = Object.values(o.B0FieldSource)
-                        }else{
-                            item.sidecar.B0FieldSource = o.B0FieldSource[0]
+                    if (o.B0FieldSource.length) {
+                        if (o.B0FieldSource.length > 1) {
+                            item.sidecar.B0FieldSource = Object.values(o.B0FieldSource);
+                        }
+                        else {
+                            item.sidecar.B0FieldSource = o.B0FieldSource[0];
                         }
                     }
                     handleItem(item, "dwi.json");

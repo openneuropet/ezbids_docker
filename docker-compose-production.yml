@@ -20,6 +20,7 @@ services:
 
     api:
         container_name: brainlife_ezbids-api
+        image: ezbids-api   # <-- explicitly set this
         build: .
         platform: linux/amd64
         volumes:
@@ -41,6 +42,7 @@ services:
 
     handler:
         container_name: brainlife_ezbids-handler
+        image: ezbids-handler   # <-- explicitly set this
         build: ./handler
         platform: linux/amd64
         volumes:
@@ -73,6 +75,7 @@ services:
     # by default this is not enabled, add COMPOSE_PROFILES=telemetry to your .env
     telemetry:
         container_name: brainlife_ezbids-telemetry
+        image: ezbids-telemetry   # <-- explicitly set this
         build: ./telemetry
         platform: linux/amd64
         depends_on:

@@ -1,53 +1,74 @@
 #!/usr/bin/env bash
 
-# Get the Ezbids directory
-EZBIDS_DIR=$(dirname `pwd`)
+EZBIDS_DIR=/home/martinnorgaard/Documents/GitHub/ezbids
+cd "$EZBIDS_DIR"
 
-# Run development script
-./dev_apptainer.sh
+# Load environment variables explicitly from the .env file
+source "$EZBIDS_DIR/apptainer/.env"
 
-# load the environment variables from the .env file
-source .env
+"$EZBIDS_DIR/apptainer/dev_apptainer.sh"
 
-if [ ! -e "mongodb.sif" ]; then
-
-    apptainer build mongodb.sif docker://mongo:4.4.15
-
+if [ ! -e "$EZBIDS_DIR/apptainer/mongodb.sif" ]; then
+    apptainer build "$EZBIDS_DIR/apptainer/mongodb.sif" docker://mongo:4.4.15
 fi
 
-# Start MongoDB container
+# Stop previously running instances explicitly
+apptainer instance stop mongodb api handler ui >/dev/null 2>&1
+
+# Explicitly start MongoDB container (port 27017 explicitly exposed)
 echo "Starting MongoDB container..."
-apptainer instance run --bind $EZBIDS_DIR:$EZBIDS_DIR --bind $EZBIDS_DIR/tmp:/tmp --bind $EZBIDS_DIR/tmp/data:/data --hostname mongodb mongodb.sif mongodb ./start_mongodb.sh
+apptainer instance run \
+  --fakeroot --writable-tmpfs \
+  --bind "$EZBIDS_DIR/tmp":/tmp \
+  --bind "$EZBIDS_DIR/tmp/data":/data/db \
+  --bind "$EZBIDS_DIR/apptainer":/app \
+  --hostname mongodb \
+  "$EZBIDS_DIR/apptainer/mongodb.sif" mongodb bash -c "cd /app && ./start_mongodb.sh --bind_ip_all" &
 
-# Wait for MongoDB to be ready
-echo "Waiting for MongoDB to be ready..."
-sleep 10  # Adjust this based on your needs (or add a health check here)
+sleep 5
 
-# Start the API container
+# Explicitly start API container (port 8082 explicitly exposed)
 echo "Starting API container..."
-apptainer instance run --bind $EZBIDS_DIR:$EZBIDS_DIR --bind $EZBIDS_DIR/tmp:/tmp --no-mount /etc/hosts --bind mongo_host:/etc/hosts api.sif api ./start_api.sh
+apptainer instance run \
+  --fakeroot \
+  --writable-tmpfs \
+  --bind "$EZBIDS_DIR/api":/app/api \
+  --bind "$EZBIDS_DIR/apptainer":/app/apptainer \
+  --bind "$EZBIDS_DIR/tmp":/tmp \
+  "$EZBIDS_DIR/apptainer/api.sif" api bash -c "cd /app/api && npm install && npm install --save-dev ts-node-dev typescript @types/node && npm run dev" &
 
-# Wait for API to be ready
-echo "Waiting for API to be ready..."
-sleep 5  # Adjust based on your setup
+sleep 5
 
-# Start the Handler container
+# Explicitly start Handler container explicitly
 echo "Starting Handler container..."
-apptainer instance run --env "PRESORT=$PRESORT" --bind $EZBIDS_DIR:$EZBIDS_DIR --bind $EZBIDS_DIR/tmp:/tmp --no-mount /etc/hosts --bind mongo_host:/etc/hosts handler.sif handler ./start_handler.sh
+apptainer instance run \
+  --fakeroot \
+  --writable-tmpfs \
+  --env "PRESORT=$PRESORT" \
+  --bind "$EZBIDS_DIR/handler":/app/handler \
+  --bind "$EZBIDS_DIR/apptainer":/app/apptainer \
+  --bind "$EZBIDS_DIR/tmp":/tmp \
+  "$EZBIDS_DIR/apptainer/handler.sif" handler bash -c "cd /app/handler && chmod +x ./start.sh && ./start.sh" &
 
-# Wait for Handler to be ready (optional)
-echo "Waiting for Handler to be ready..."
-sleep 5  # Adjust as needed
+sleep 5
 
-# Start the UI container
-echo "Starting UI container..."
-apptainer instance run --bind $EZBIDS_DIR:$EZBIDS_DIR --env "VITE_APIHOST=http://$SERVER_NAME:8082"  ui.sif ui ./start_ui.sh
+# Explicitly start UI container explicitly (port 3000 explicitly exposed)
+echo "Starting UI container explicitly..."
+apptainer instance run \
+  --bind "$EZBIDS_DIR/ui":/ui \
+  --bind "$EZBIDS_DIR/tmp":/tmp \
+  --env "VITE_APIHOST=http://localhost:8082" \
+  --env "BRAINLIFE_PRODUCTION=false" \
+  "$EZBIDS_DIR/apptainer/ui.sif" ui bash -c "cd /ui && ./entrypoint.sh"
 
-# Start Telemetry container (if in development profile)
+sleep 5
+
 if [ "$PROFILE" == "development" ]; then
     echo "Starting Telemetry container..."
-    apptainer instance --bind $EZBIDS_DIR:$EZBIDS_DIR run telemetry.sif telementry ./start_telementry.sh
+    apptainer instance run \
+      --bind "$EZBIDS_DIR":/app \
+      "$EZBIDS_DIR/apptainer/telemetry.sif" telemetry bash -c "cd /app/apptainer && ./start_telemetry.sh" &
 fi
 
-# Inform user that containers are running
-echo "All containers are running"
+echo "All containers are running explicitly"
+
