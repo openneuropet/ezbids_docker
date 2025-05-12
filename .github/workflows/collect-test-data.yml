@@ -27,10 +27,17 @@ jobs:
           restore-keys: |
             test-data-
 
-      - name: Get test data if not cached
+      - name: Get and process test data
         if: steps.test-data-cache.outputs.cache-hit != 'true'
+        id: get-test-data
+        run: make get-test-data
+
+      - name: Calculate test data hash
+        id: test-data-hash
         run: |
-          make get-test-data
+          # Create a hash of all the test data files
+          find test/test_data -type f -exec sha256sum {} \; | sort | sha256sum | cut -d' ' -f1 > test_data_hash.txt
+          echo "hash=$(cat test_data_hash.txt)" >> $GITHUB_OUTPUT
 
       - name: Verify test data
         run: |

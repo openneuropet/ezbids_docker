@@ -15,8 +15,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      images: ${{ steps.save-images.outputs.images }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,34 +22,47 @@ jobs:
         id: repo
         run: echo "REPO_NAME=$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
 
+      - name: Cache Docker images
+        uses: actions/cache@v4
+        id: docker-cache
+        with:
+          path: |
+            mongo.tar
+            api.tar
+            handler.tar
+            ui.tar
+          key: docker-local-images-${{ github.sha }}
+          restore-keys: |
+            docker-local-images-
+
       - name: Pull required images
+        if: steps.docker-cache.outputs.cache-hit != 'true'
         run: docker compose -f ${{ env.COMPOSE_FILE }} pull
 
       - name: Build services
+        if: steps.docker-cache.outputs.cache-hit != 'true'
         run: docker compose -f ${{ env.COMPOSE_FILE }} build
 
       - name: Save images
-        id: save-images
+        if: steps.docker-cache.outputs.cache-hit != 'true'
         run: |
           # Save images to tar files
           docker save mongo > mongo.tar
           docker save ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest > api.tar
           docker save ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest > handler.tar
           docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui.tar
-          
-          # Upload as artifacts
-          echo "images=mongo.tar,api.tar,handler.tar,ui.tar" >> $GITHUB_OUTPUT
-          
-      - name: Upload images
-        uses: actions/upload-artifact@v4
+
+      - name: Upload Docker images cache
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
         with:
-          name: docker-images-local
           path: |
             mongo.tar
             api.tar
             handler.tar
             ui.tar
-          retention-days: 1
+          key: docker-images-${{ github.sha }}
 
       - name: Clean up
+        if: always()
         run: docker system prune -f 
