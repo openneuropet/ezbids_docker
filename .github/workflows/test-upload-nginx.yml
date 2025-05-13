@@ -1,4 +1,4 @@
-name: Test Local Upload
+name: Test Nginx Upload
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
   pull_request:
     branches: [ master ]
   workflow_run:
-    workflows: ["Docker Build (Local)"]
+    workflows: ["Docker Build (Nginx)"]
     types:
       - completed
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  Test-Local-Uploads:
+  Test-Nginx-Uploads:
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
@@ -21,7 +21,7 @@ jobs:
       (github.event_name == 'pull_request' && github.event.workflow_run.conclusion == 'success')
     
     env:
-      COMPOSE_FILE: ./docker-compose.yml
+      COMPOSE_FILE: ./docker-compose-nginx.yml
       REGISTRY_PREFIX: docker.io/library
 
     steps:
@@ -54,31 +54,54 @@ jobs:
             mongo.tar
             api.tar
             handler.tar
-            ui.tar
           key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
           restore-keys: |
             docker-local-images-
 
+      - name: Cache Nginx images
+        uses: actions/cache@v4
+        id: nginx-cache
+        with:
+          path: |
+            ui-nginx.tar
+            nginx.tar
+          key: docker-nginx-images-${{ github.event.workflow_run.head_sha || github.sha }}
+          restore-keys: |
+            docker-nginx-images-
+
       - name: Load images
         run: |
-          # Load images and verify they were loaded successfully
+          # Load base images
           docker load < mongo.tar || exit 1
           rm mongo.tar
-          
           docker load < api.tar || exit 1
           # Tag the API image to match docker-compose
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
           rm api.tar
-          
           docker load < handler.tar || exit 1
           # Tag the handler image to match docker-compose
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
           rm handler.tar
           
-          docker load < ui.tar || exit 1
+          # Load nginx images
+          docker load < ui-nginx.tar || exit 1
           # Tag the UI image to match docker-compose
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
-          rm ui.tar
+          rm ui-nginx.tar
+          docker load < nginx.tar || exit 1
+          rm nginx.tar
+
+      - name: Do additional Nginx setup
+        run: |
+          # create self signed certs using the hostname
+          ./create_self_signed_certs.sh localhost
+          
+          # copy the example.env to .env
+          cp example.env .env
+
+          # Update .env to use the hostname
+          sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost" .env
+          sed -i "s/BRAINLIFE_USE_NGINX=.*/BRAINLIFE_USE_NGINX=true/" .env
 
       - name: Start services
         run: |
@@ -87,7 +110,7 @@ jobs:
           chmod 770 /tmp/ezbids-workdir
           
           # Start services using our tagged images
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d
+          ./launch.sh --daemon
           sleep 30
 
       - name: Install uv
