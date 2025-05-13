@@ -5,11 +5,12 @@ on:
     workflows: ["Docker Build (Local)"]
     types:
       - completed
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   Test-Local-Uploads:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
     env:
       COMPOSE_FILE: ./docker-compose.yml
@@ -46,7 +47,7 @@ jobs:
             api.tar
             handler.tar
             ui.tar
-          key: docker-local-images-${{ github.event.workflow_run.head_sha }}
+          key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
           restore-keys: |
             docker-local-images-
 
@@ -55,10 +56,22 @@ jobs:
         run: |
           # Load images and verify they were loaded successfully
           docker load < mongo.tar || exit 1
-          docker load < api.tar || exit 1
-          docker load < handler.tar || exit 1
-          docker load < ui.tar || exit 1
+          rm mongo.tar
           
+          docker load < api.tar || exit 1
+          # Tag the API image to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
+          rm api.tar
+          
+          docker load < handler.tar || exit 1
+          # Tag the handler image to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
+          rm handler.tar
+          
+          docker load < ui.tar || exit 1
+          # Tag the UI image to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
+          rm ui.tar
 
       - name: Start services
         run: |
