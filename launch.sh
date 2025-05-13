@@ -67,6 +67,29 @@ else
   mkdir -p ${EZBIDS_TMP_DIR}
 fi
 
+# Ensure proper permissions for Docker access
+# Get the current user's UID and GID
+CURRENT_UID=$(id -u)
+CURRENT_GID=$(id -g)
+
+# Set permissions to allow Docker access
+if ! chmod 770 ${EZBIDS_TMP_DIR} 2>/dev/null; then
+    echo "Warning: Unable to set permissions on ${EZBIDS_TMP_DIR}"
+    echo "You may need to run one of the following commands with sudo:"
+    echo "  sudo chmod 770 ${EZBIDS_TMP_DIR}"
+    echo "  sudo chown ${CURRENT_UID}:${CURRENT_GID} ${EZBIDS_TMP_DIR}"
+    echo "Alternatively, you can set EZBIDS_TMP_DIR in your .env file to a directory you own."
+    exit 1
+fi
+
+if ! chown ${CURRENT_UID}:${CURRENT_GID} ${EZBIDS_TMP_DIR} 2>/dev/null; then
+    echo "Warning: Unable to set ownership on ${EZBIDS_TMP_DIR}"
+    echo "You may need to run:"
+    echo "  sudo chown ${CURRENT_UID}:${CURRENT_GID} ${EZBIDS_TMP_DIR}"
+    echo "Alternatively, you can set EZBIDS_TMP_DIR in your .env file to a directory you own."
+    exit 1
+fi
+
 # ok docker compose is now included in docker as an option for docker
 if [[ $(command -v docker-compose) ]]; then 
     # if the older version is installed use the dash
