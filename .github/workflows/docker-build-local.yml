@@ -15,8 +15,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      images: ${{ steps.save-images.outputs.images }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,27 +29,21 @@ jobs:
         run: docker compose -f ${{ env.COMPOSE_FILE }} build
 
       - name: Save images
-        id: save-images
         run: |
           # Save images to tar files
           docker save mongo > mongo.tar
           docker save ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest > api.tar
           docker save ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest > handler.tar
           docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui.tar
-          
-          # Upload as artifacts
-          echo "images=mongo.tar,api.tar,handler.tar,ui.tar" >> $GITHUB_OUTPUT
-          
-      - name: Upload images
-        uses: actions/upload-artifact@v4
+
+      - name: Cache Docker images
+        uses: actions/cache@v4
         with:
-          name: docker-images-local
           path: |
             mongo.tar
             api.tar
             handler.tar
             ui.tar
-          retention-days: 1
-
-      - name: Clean up
-        run: docker system prune -f 
+          key: docker-local-images-${{ github.sha }}
+          restore-keys: |
+            docker-local-images-

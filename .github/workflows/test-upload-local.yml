@@ -7,7 +7,7 @@ on:
       - completed
 
 jobs:
-  test:
+  Test-Local-Uploads:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     
@@ -35,31 +35,44 @@ jobs:
       - name: Get test data if not cached
         if: steps.test-data-cache.outputs.cache-hit != 'true'
         run: |
-          cd test
-          make gettestdata
+          make get-test-data
 
-      - name: Download images
-        uses: actions/download-artifact@v4
+      - name: Cache Docker images
+        uses: actions/cache@v4
+        id: docker-cache
         with:
-          name: docker-images-local
-          path: .
+          path: |
+            mongo.tar
+            api.tar
+            handler.tar
+            ui.tar
+          key: docker-local-images-${{ github.event.workflow_run.head_sha }}
+          restore-keys: |
+            docker-local-images-
 
       - name: Load images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
         run: |
-          docker load < mongo.tar
-          docker load < api.tar
-          docker load < handler.tar
-          docker load < ui.tar
-
-      - name: Tag images
-        run: |
-          docker tag mongo:latest mongo:test
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest ${REPO_NAME}-api:test
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest ${REPO_NAME}-handler:test
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ${REPO_NAME}-ui:test
+          # Load images and verify they were loaded successfully
+          docker load < mongo.tar || exit 1
+          docker load < api.tar || exit 1
+          docker load < handler.tar || exit 1
+          docker load < ui.tar || exit 1
+          
+          # Verify images exist
+          docker image inspect mongo:latest || exit 1
+          docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest || exit 1
+          docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest || exit 1
+          docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest || exit 1
 
       - name: Start services
-        run: docker compose -f ${{ env.COMPOSE_FILE }} up -d
+        run: |
+          # Create and set permissions for temp directory
+          mkdir -p /tmp/ezbids-workdir
+          chmod 770 /tmp/ezbids-workdir
+          
+          # Start services using our tagged images
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d
 
       - name: Wait for services to be ready
         run: |
