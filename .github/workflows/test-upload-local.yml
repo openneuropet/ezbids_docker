@@ -80,17 +80,7 @@ jobs:
           
           # Start services using our tagged images
           docker compose -f ${{ env.COMPOSE_FILE }} up -d
-
-      - name: Wait for services to be ready
-        run: |
-          # Wait for MongoDB
-          timeout 60 bash -c 'until docker compose -f ${{ env.COMPOSE_FILE }} exec -T mongo mongosh --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; do sleep 2; done'
-          
-          # Wait for API
-          timeout 60 bash -c 'until curl -s http://localhost:8082/health > /dev/null; do sleep 2; done'
-          
-          # Wait for UI
-          timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 2; done'
+          sleep 30
 
       - name: Install uv
         run: |
@@ -100,18 +90,6 @@ jobs:
       - name: Verify uv installation
         run: uv --version
 
-      - name: Setup test environment
-        run: |
-          cd test
-          make setup-test
-
       - name: Run upload test
         run: |
-          cd test
           make test-upload
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose -f ${{ env.COMPOSE_FILE }} down
-          docker system prune -f 
