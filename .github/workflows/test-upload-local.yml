@@ -53,20 +53,40 @@ jobs:
       - name: Load images
         if: steps.docker-cache.outputs.cache-hit == 'true'
         run: |
-          docker load < mongo.tar
-          docker load < api.tar
-          docker load < handler.tar
-          docker load < ui.tar
+          # Load images and verify they were loaded successfully
+          docker load < mongo.tar || exit 1
+          docker load < api.tar || exit 1
+          docker load < handler.tar || exit 1
+          docker load < ui.tar || exit 1
+          
+          # Verify images exist
+          docker image inspect mongo:latest || exit 1
+          docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest || exit 1
+          docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest || exit 1
+          docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest || exit 1
 
       - name: Tag images
         run: |
+          # Tag images and verify tags
           docker tag mongo:latest mongo:test
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest ${REPO_NAME}-api:test
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest ${REPO_NAME}-handler:test
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ${REPO_NAME}-ui:test
+          
+          # Verify tags exist
+          docker image inspect mongo:test || exit 1
+          docker image inspect ${REPO_NAME}-api:test || exit 1
+          docker image inspect ${REPO_NAME}-handler:test || exit 1
+          docker image inspect ${REPO_NAME}-ui:test || exit 1
 
       - name: Start services
-        run: docker compose -f ${{ env.COMPOSE_FILE }} up -d
+        run: |
+          # Create and set permissions for temp directory
+          mkdir -p /tmp/ezbids-workdir
+          chmod 770 /tmp/ezbids-workdir
+          
+          # Start services in detached mode
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d
 
       - name: Wait for services to be ready
         run: |
