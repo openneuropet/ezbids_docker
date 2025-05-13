@@ -14,7 +14,11 @@ on:
 jobs:
   Test-Nginx-Uploads:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event_name == 'pull_request' }}
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'push' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'pull_request' && github.event.workflow_run.conclusion == 'success')
     
     env:
       COMPOSE_FILE: ./docker-compose-nginx.yml
