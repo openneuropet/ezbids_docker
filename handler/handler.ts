@@ -1,4 +1,3 @@
-
 const { spawn } = require('child_process');
 import fs = require('fs');
 
@@ -40,7 +39,7 @@ function run() {
             }
         }
         console.log("waiting a bit before looking for more jobs");
-        setTimeout(run, 1000*3);
+        setTimeout(run, 1000*1);
     });
 }
 
