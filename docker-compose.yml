@@ -31,6 +31,10 @@ services:
                 condition: service_healthy
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+            interval: 10s
+            timeout: 10s
+            retries: 5
+            start_period: 30s
         working_dir: /app/api
         command:
             ./dev.sh
@@ -61,7 +65,7 @@ services:
         networks:
             - ezbids
         tty: true #turn on color for bids-validator output
-        command: pm2 start handler.js --attach --watch --ignore-watch "ui **/node_modules"
+        command: pm2 start handler.js --attach --watch --ignore-watch "ui **/node_modules **__pycache__**"
 
     ui:
         container_name: brainlife_ezbids-ui
@@ -70,8 +74,16 @@ services:
         environment:
             VITE_APIHOST: http://${SERVER_NAME:-localhost}:8082
             VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
+        depends_on:
+            - api
+            - mongodb
+            - handler
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:3000"]
+            interval: 10s
+            timeout: 10s
+            retries: 5
+            start_period: 30s
         ports:
             - 3000:3000 #vite wants to be exposed on the host for HMR?
         networks:
