@@ -1,0 +1,118 @@
+name: Test Nginx Upload
+
+on:
+  workflow_run:
+    workflows: ["Docker Build (Nginx)"]
+    types:
+      - completed
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  Test-Nginx-Uploads:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    env:
+      COMPOSE_FILE: ./docker-compose-nginx.yml
+      REGISTRY_PREFIX: docker.io/library
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true  # Ensure we get the submodule info
+
+      - name: Set repository name
+        run: echo "REPO_NAME=$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
+
+      - name: Cache test data
+        uses: actions/cache@v4
+        id: test-data-cache
+        with:
+          path: test/test_data
+          key: test-data-${{ hashFiles('.gitmodules') }}
+          restore-keys: |
+            test-data-
+
+      - name: Get test data if not cached
+        if: steps.test-data-cache.outputs.cache-hit != 'true'
+        run: |
+          make get-test-data
+
+      - name: Cache Docker images
+        uses: actions/cache@v4
+        id: docker-cache
+        with:
+          path: |
+            mongo.tar
+            api.tar
+            handler.tar
+          key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
+          restore-keys: |
+            docker-local-images-
+
+      - name: Cache Nginx images
+        uses: actions/cache@v4
+        id: nginx-cache
+        with:
+          path: |
+            ui-nginx.tar
+            nginx.tar
+          key: docker-nginx-images-${{ github.event.workflow_run.head_sha || github.sha }}
+          restore-keys: |
+            docker-nginx-images-
+
+      - name: Load images
+        run: |
+          # Load base images
+          docker load < mongo.tar || exit 1
+          rm mongo.tar
+          docker load < api.tar || exit 1
+          # Tag the API image to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
+          rm api.tar
+          docker load < handler.tar || exit 1
+          # Tag the handler image to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
+          rm handler.tar
+          
+          # Load nginx images
+          docker load < ui-nginx.tar || exit 1
+          # Tag the UI image to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
+          rm ui-nginx.tar
+          docker load < nginx.tar || exit 1
+          rm nginx.tar
+
+      - name: Do additional Nginx setup
+        run: |
+          # create self signed certs using the hostname
+          ./create_self_signed_certs.sh localhost
+          
+          # copy the example.env to .env
+          cp example.env .env
+
+          # Update .env to use the hostname
+          sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost" .env
+          sed -i "s/BRAINLIFE_USE_NGINX=.*/BRAINLIFE_USE_NGINX=true/" .env
+
+      - name: Start services
+        run: |
+          # Create and set permissions for temp directory
+          mkdir -p /tmp/ezbids-workdir
+          chmod 770 /tmp/ezbids-workdir
+          
+          # Start services using our tagged images
+          ./launch.sh --daemon
+          sleep 30
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Verify uv installation
+        run: uv --version
+
+      - name: Run upload test
+        run: |
+          make test-upload
