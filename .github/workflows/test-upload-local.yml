@@ -65,27 +65,13 @@ jobs:
           docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest || exit 1
           docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest || exit 1
 
-      - name: Tag images
-        run: |
-          # Tag images and verify tags
-          docker tag mongo:latest mongo:test
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest ${REPO_NAME}-api:test
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest ${REPO_NAME}-handler:test
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ${REPO_NAME}-ui:test
-          
-          # Verify tags exist
-          docker image inspect mongo:test || exit 1
-          docker image inspect ${REPO_NAME}-api:test || exit 1
-          docker image inspect ${REPO_NAME}-handler:test || exit 1
-          docker image inspect ${REPO_NAME}-ui:test || exit 1
-
       - name: Start services
         run: |
           # Create and set permissions for temp directory
           mkdir -p /tmp/ezbids-workdir
           chmod 770 /tmp/ezbids-workdir
           
-          # Start services in detached mode
+          # Start services using our tagged images
           docker compose -f ${{ env.COMPOSE_FILE }} up -d
 
       - name: Wait for services to be ready

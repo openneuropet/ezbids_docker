@@ -22,9 +22,22 @@ jobs:
         id: repo
         run: echo "REPO_NAME=$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
 
+      - name: Pull required images
+        run: docker compose -f ${{ env.COMPOSE_FILE }} pull
+
+      - name: Build services
+        run: docker compose -f ${{ env.COMPOSE_FILE }} build
+
+      - name: Save images
+        run: |
+          # Save images to tar files
+          docker save mongo > mongo.tar
+          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest > api.tar
+          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest > handler.tar
+          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui.tar
+
       - name: Cache Docker images
         uses: actions/cache@v4
-        id: docker-cache
         with:
           path: |
             mongo.tar
@@ -34,35 +47,3 @@ jobs:
           key: docker-local-images-${{ github.sha }}
           restore-keys: |
             docker-local-images-
-
-      - name: Pull required images
-        if: steps.docker-cache.outputs.cache-hit != 'true'
-        run: docker compose -f ${{ env.COMPOSE_FILE }} pull
-
-      - name: Build services
-        if: steps.docker-cache.outputs.cache-hit != 'true'
-        run: docker compose -f ${{ env.COMPOSE_FILE }} build
-
-      - name: Save images
-        if: steps.docker-cache.outputs.cache-hit != 'true'
-        run: |
-          # Save images to tar files
-          docker save mongo > mongo.tar
-          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest > api.tar
-          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest > handler.tar
-          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui.tar
-
-      - name: Upload Docker images cache
-        if: steps.docker-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-            ui.tar
-          key: docker-images-${{ github.sha }}
-
-      - name: Clean up
-        if: always()
-        run: docker system prune -f 
