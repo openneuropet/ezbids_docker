@@ -1,5 +1,6 @@
 [![Docker Build (Local)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-local.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-local.yml)
 [![Docker Build (Nginx)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-nginx.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/docker-build-nginx.yml)
+[![Test Local Upload](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-local.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-local.yml)
 
 # ezBIDS
 
