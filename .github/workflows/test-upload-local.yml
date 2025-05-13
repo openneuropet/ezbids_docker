@@ -60,7 +60,7 @@ jobs:
           docker load < ui.tar || exit 1
           
           # Verify images exist
-          docker image inspect mongo:latest || exit 1
+          docker image inspect mongo || exit 1
           docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest || exit 1
           docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest || exit 1
           docker image inspect ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest || exit 1
