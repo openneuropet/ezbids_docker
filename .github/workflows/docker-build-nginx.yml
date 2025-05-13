@@ -53,6 +53,9 @@ jobs:
       - name: Build UI with nginx
         run: docker compose -f ${{ env.COMPOSE_FILE }} build ui
 
+      - name: Pull nginx image
+        run: docker compose -f ${{ env.COMPOSE_FILE }} pull nginx
+
       - name: Save images
         run: |
           # Save all ui and nginximages to tar files
