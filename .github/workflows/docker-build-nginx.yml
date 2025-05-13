@@ -58,12 +58,13 @@ jobs:
 
       - name: Save images
         run: |
-          # Save all ui and nginximages to tar files
+          # Save all ui and nginx images to tar files
           docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui-nginx.tar
           docker save nginx > nginx.tar
 
-      - name: Cache Docker images
+      - name: Cache Nginx images
         uses: actions/cache@v4
+        id: nginx-cache
         with:
           path: |
             ui-nginx.tar
