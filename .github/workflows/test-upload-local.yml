@@ -52,7 +52,6 @@ jobs:
             docker-local-images-
 
       - name: Load images
-        if: steps.docker-cache.outputs.cache-hit == 'true'
         run: |
           # Load images and verify they were loaded successfully
           docker load < mongo.tar || exit 1
