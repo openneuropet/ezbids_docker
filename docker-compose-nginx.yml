@@ -69,6 +69,7 @@ services:
         environment:
             VITE_APIHOST: https://${SERVER_NAME}/api
             VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
+            BRAINLIFE_USE_NGINX: true
         volumes:
             - ui_dist:/ui/dist
         command: tail -f /dev/null # Keep container running

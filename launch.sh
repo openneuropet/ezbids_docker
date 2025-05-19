@@ -11,6 +11,21 @@
 # script to automatically generate and locate those certificates into the nginx/ssl/ 
 # folder.
 
+# Parse command line arguments
+DAEMON_MODE=false
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -d|--daemon)
+      DAEMON_MODE=true
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
 # check to see if a .env file exists
 if [ -f .env ]; then
     echo ".env file exists, loading environment variables from .env file"
@@ -93,8 +108,16 @@ fi
 # ok docker compose is now included in docker as an option for docker
 if [[ $(command -v docker-compose) ]]; then 
     # if the older version is installed use the dash
-    docker-compose --file ${DOCKER_COMPOSE_FILE} up
+    if [ "$DAEMON_MODE" = true ]; then
+        docker-compose --file ${DOCKER_COMPOSE_FILE} up -d
+    else
+        docker-compose --file ${DOCKER_COMPOSE_FILE} up
+    fi
 else
     # if the newer version is installed don't use the dash
-    docker compose --file ${DOCKER_COMPOSE_FILE} up
+    if [ "$DAEMON_MODE" = true ]; then
+        docker compose --file ${DOCKER_COMPOSE_FILE} up -d
+    else
+        docker compose --file ${DOCKER_COMPOSE_FILE} up
+    fi
 fi
