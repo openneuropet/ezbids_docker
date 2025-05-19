@@ -63,27 +63,40 @@ jobs:
           restore-keys: |
             docker-nginx-images-
 
-      - name: Load images
+      - name: Build or load base images
         run: |
-          # Load base images
-          docker load < mongo.tar || exit 1
-          rm mongo.tar
-          docker load < api.tar || exit 1
-          # Tag the API image to match docker-compose
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
-          rm api.tar
-          docker load < handler.tar || exit 1
-          # Tag the handler image to match docker-compose
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
-          rm handler.tar
+          if [ -f mongo.tar ]; then
+            echo "Loading cached base images..."
+            docker load < mongo.tar
+            rm mongo.tar
+            docker load < api.tar
+            rm api.tar
+            docker load < handler.tar
+            rm handler.tar
+          else
+            echo "Building base images..."
+            docker compose -f ${{ env.COMPOSE_FILE }} build mongo api handler
+          fi
           
-          # Load nginx images
-          docker load < ui-nginx.tar || exit 1
+          # Tag the images to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
+
+      - name: Build or load nginx images
+        run: |
+          if [ -f ui-nginx.tar ] && [ -f nginx.tar ]; then
+            echo "Loading cached nginx images..."
+            docker load < ui-nginx.tar
+            rm ui-nginx.tar
+            docker load < nginx.tar
+            rm nginx.tar
+          else
+            echo "Building nginx images..."
+            docker compose -f ${{ env.COMPOSE_FILE }} build ui nginx
+          fi
+          
           # Tag the UI image to match docker-compose
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
-          rm ui-nginx.tar
-          docker load < nginx.tar || exit 1
-          rm nginx.tar
 
       - name: Do additional Nginx setup
         run: |

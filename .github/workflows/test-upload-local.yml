@@ -53,26 +53,27 @@ jobs:
           restore-keys: |
             docker-local-images-
 
-      - name: Load images
+      - name: Build or load images
         run: |
-          # Load images and verify they were loaded successfully
-          docker load < mongo.tar || exit 1
-          rm mongo.tar
+          if [ -f mongo.tar ]; then
+            echo "Loading cached images..."
+            docker load < mongo.tar
+            rm mongo.tar
+            docker load < api.tar
+            rm api.tar
+            docker load < handler.tar
+            rm handler.tar
+            docker load < ui.tar
+            rm ui.tar
+          else
+            echo "Building images..."
+            docker compose -f ${{ env.COMPOSE_FILE }} build
+          fi
           
-          docker load < api.tar || exit 1
-          # Tag the API image to match docker-compose
+          # Tag the images to match docker-compose
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
-          rm api.tar
-          
-          docker load < handler.tar || exit 1
-          # Tag the handler image to match docker-compose
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
-          rm handler.tar
-          
-          docker load < ui.tar || exit 1
-          # Tag the UI image to match docker-compose
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
-          rm ui.tar
 
       - name: Start services
         run: |
