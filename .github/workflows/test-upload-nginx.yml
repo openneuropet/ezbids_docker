@@ -80,13 +80,13 @@ jobs:
             echo "Loading cached base images..."
             if ! docker load < mongo.tar || ! docker load < api.tar || ! docker load < handler.tar; then
               echo "Failed to load cached images, building instead..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build mongo api handler
+              docker compose -f ${{ env.COMPOSE_FILE }} build
             else
               rm mongo.tar api.tar handler.tar
             fi
           else
             echo "Building base images..."
-            docker compose -f ${{ env.COMPOSE_FILE }} build mongo api handler
+            docker compose -f ${{ env.COMPOSE_FILE }} build
           fi
           
           # Tag the images to match docker-compose
@@ -99,13 +99,13 @@ jobs:
             echo "Loading cached nginx images..."
             if ! docker load < ui-nginx.tar || ! docker load < nginx.tar; then
               echo "Failed to load cached nginx images, building instead..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build ui nginx
+              docker compose -f ${{ env.COMPOSE_FILE }} build
             else
               rm ui-nginx.tar nginx.tar
             fi
           else
             echo "Building nginx images..."
-            docker compose -f ${{ env.COMPOSE_FILE }} build ui nginx
+            docker compose -f ${{ env.COMPOSE_FILE }} build
           fi
           
           # Tag the UI image to match docker-compose
