@@ -76,14 +76,14 @@ jobs:
 
       - name: Build or load base images
         run: |
-          if [ -f mongo.tar ]; then
+          if [ -f mongo.tar ] && [ -f api.tar ] && [ -f handler.tar ]; then
             echo "Loading cached base images..."
-            docker load < mongo.tar
-            rm mongo.tar
-            docker load < api.tar
-            rm api.tar
-            docker load < handler.tar
-            rm handler.tar
+            if ! docker load < mongo.tar || ! docker load < api.tar || ! docker load < handler.tar; then
+              echo "Failed to load cached images, building instead..."
+              docker compose -f ${{ env.COMPOSE_FILE }} build mongo api handler
+            else
+              rm mongo.tar api.tar handler.tar
+            fi
           else
             echo "Building base images..."
             docker compose -f ${{ env.COMPOSE_FILE }} build mongo api handler
@@ -97,10 +97,12 @@ jobs:
         run: |
           if [ -f ui-nginx.tar ] && [ -f nginx.tar ]; then
             echo "Loading cached nginx images..."
-            docker load < ui-nginx.tar
-            rm ui-nginx.tar
-            docker load < nginx.tar
-            rm nginx.tar
+            if ! docker load < ui-nginx.tar || ! docker load < nginx.tar; then
+              echo "Failed to load cached nginx images, building instead..."
+              docker compose -f ${{ env.COMPOSE_FILE }} build ui nginx
+            else
+              rm ui-nginx.tar nginx.tar
+            fi
           else
             echo "Building nginx images..."
             docker compose -f ${{ env.COMPOSE_FILE }} build ui nginx
