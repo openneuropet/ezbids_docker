@@ -17,6 +17,7 @@ jobs:
     env:
       COMPOSE_FILE: ./docker-compose.yml
       REGISTRY_PREFIX: docker.io/library
+      SERVER_NAME: localhost
 
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +53,14 @@ jobs:
           key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
           restore-keys: |
             docker-local-images-
+
+      - name: Setup environment
+        run: |
+          # copy the example.env to .env
+          cp example.env .env
+
+          # Update .env to use the hostname
+          sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost/" .env
 
       - name: Build or load images
         run: |

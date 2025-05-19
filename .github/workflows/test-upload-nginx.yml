@@ -17,6 +17,8 @@ jobs:
     env:
       COMPOSE_FILE: ./docker-compose-nginx.yml
       REGISTRY_PREFIX: docker.io/library
+      SERVER_NAME: localhost
+      BRAINLIFE_USE_NGINX: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +65,15 @@ jobs:
           restore-keys: |
             docker-nginx-images-
 
+      - name: Setup environment
+        run: |
+          # copy the example.env to .env
+          cp example.env .env
+
+          # Update .env to use the hostname
+          sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost/" .env
+          sed -i "s/BRAINLIFE_USE_NGINX=.*/BRAINLIFE_USE_NGINX=true/" .env
+
       - name: Build or load base images
         run: |
           if [ -f mongo.tar ]; then
@@ -102,13 +113,6 @@ jobs:
         run: |
           # create self signed certs using the hostname
           ./create_self_signed_certs.sh localhost
-          
-          # copy the example.env to .env
-          cp example.env .env
-
-          # Update .env to use the hostname
-          sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost" .env
-          sed -i "s/BRAINLIFE_USE_NGINX=.*/BRAINLIFE_USE_NGINX=true/" .env
 
       - name: Start services
         run: |
