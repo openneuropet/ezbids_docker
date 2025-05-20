@@ -1,3 +1,12 @@
+Below is the original readme that instructed a user on how to export this docker compose based project
+into singularity. For "simplicity's" sake, the building of both docker and singularity images was moved
+to the Makefile at the top of this repository. To get this singularity/apptainer codebase up and running
+try (emphasis on try) to execute the following commands:
+
+```bash
+make export-and-build
+```
+
 # Apptainer for ezBIDS
 
 This guide provides steps to convert Docker containers into Apptainer images and run them efficiently.

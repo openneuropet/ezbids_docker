@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
 
+# This is a an attempt to emulate docker compose using apptainer and images
+# created from a set of docker files. Multiple extra steps in:
+# - configuration
+# - directory creation
+# - setting of permissions
+# - you name it
+# that are required to get singularity to work are implemented here
+# this script may/maynot need to be run with sudo so that it's able to either/or:
+# - mount reserved ports 80 and 443
+# - enable networking between the containers
+# - use sudo to disable sudo
+# To be honest I can't recall what did what, just try running this following 
+# make export-and-build
+
 # Disable setuid to avoid requiring sudo
 export APPTAINER_ALLOW_SETUID=0
 
