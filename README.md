@@ -3,7 +3,7 @@
 [![Test Local Upload](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-local.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-local.yml)
 [![Test Nginx Upload](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-nginx.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-nginx.yml)
 
-# THIS FORK INCLUDES ADDITINAL SUPPORT SPECIFICALLY FOR PET ([ORIGINAL PROJECT](https://github.com/brainlife/ezbids))
+# THIS FORK INCLUDES ADDITIONAL SUPPORT SPECIFICALLY FOR PET ([ORIGINAL PROJECT](https://github.com/brainlife/ezbids))
 
 # ezBIDS
 
