@@ -3,6 +3,8 @@
 [![Test Local Upload](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-local.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-local.yml)
 [![Test Nginx Upload](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-nginx.yml/badge.svg)](https://github.com/openneuropet/ezbids_docker/actions/workflows/test-upload-nginx.yml)
 
+# THIS FORK INCLUDES ADDITINAL SUPPORT SPECIFICALLY FOR PET ([ORIGINAL PROJECT](https://github.com/brainlife/ezbids))
+
 # ezBIDS
 
 The secure, cloud-based service for the semi-automated mapping of entire sessions of neuroimaging data to the Brain Imaging Data Structure ([BIDS](https://bids.neuroimaging.io/)) standard.  
