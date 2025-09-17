@@ -13,7 +13,7 @@ The secure, cloud-based service for the semi-automated mapping of entire session
 
 ### About
 
-This is the repository for a semi-supervised web-service for converting neuroimaging data files to [BIDS](https://bids.neuroimaging.io/). The web service is securely hosted at [brainlife.io/ezbids](https://brainlife.io/ezbids). For additional details on security feaures, please see [here](https://brainlife.io/docs/using_ezBIDS/#faq).
+This is the repository for a semi-supervised web-service for converting neuroimaging data files to [BIDS](https://bids.neuroimaging.io/). This specific repository exists for users wishing to deploy this web service on premise.
 
 Unlike other BIDS converters, ezBIDS eliminates the need for coding and command line interfaces (CLI), doing the bulk of the work behind the scenes to save users time. Importantly, ezBIDS does not require an organizational structure for uploaded data.
 
@@ -32,19 +32,48 @@ Helpful links:
 
 ### Usage
 
-To access the ezBIDS web service, please visit https://brainlife.io/ezbids. If you do not have a brainlife.io account, you will be prompted to create one for authentication purposes.
-
 Users do not need to organize their uploaded data in any specific manner, and users may choose to compress (e.g. zip, tar) their uploaded data.
 
 Should users feel the need to anonymize data before uploading, we strongly recommend that subjects (and sessions, if applicable) be organized into subject (and session) folders, with explicit labeling of the preferred subjects (and sessions) IDs (e.g. `MRI_data/sub-01/ses-01/DICOMS`). Failure to do so for non-anonymized data may result in an inaccurate *first guess* and require additional edits in the web browser.
 
 #### Local Usage
 
-There are two methods for deploying this service one for local use and another using nginx for sitewide deployments.
+There are three methods for deploying this service one for local use, another using nginx for sitewide deployments, and an apptainer option for local use
+where docker is unavailable.
 
-For users that can are not setting this service up for others it's recommended to run without nginx.
+For users that can are not setting this service up for others it's recommended to run without nginx. Additionally, for impermanent deployments
+users can be up and running with 1 command and no other configuration:
 
-In either case, the initial setup requires configuring the local environment via
+```bash
+docker compose up
+# or to hide the output
+docker compose up -d
+```
+
+**Apptainer Use**
+
+The apptainer image must be built from the `EverythingDockerfile`, which is in turn dependent on the images defined/tagged in `docker-compose.yml` being
+built. To create the apptainer image one must do the following:
+
+```bash
+git clone https://github.com/openneuropet/ezbids_docker.git
+cd ezbids_docker
+docker compose build
+docker build -f EverythingDockerfile -t ezbids-everything .
+```
+
+Then the run the following apptainer commands:
+```bash
+apptainer build ezbids-everything.sif docker-daemon://ezbids-everything:latest
+apptainer run --fakeroot --writable-tmpfs --cleanenv --no-home ezbids-everything.sif
+```
+
+It should be noted that apptainer occasionally changes which ports it maps the ezBIDS ui to, but that will be mentioned in the console following 
+the apptainer run step above.
+
+**Back to Docker**
+
+For a sitewide deployment, the initial setup requires configuring the local environment via
 a `.env` file. The first steps are to copy the `example.env` file in this repo 
 to `.env`:
 
