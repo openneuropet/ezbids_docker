@@ -1,0 +1,247 @@
+# EverythingDockerfile - Multistage build combining all services
+# This combines mongodb, api, handler, ui, and telemetry into a single container
+
+# Stage 1: MongoDB base
+FROM mongo:4.4.15 AS mongodb-stage
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Stage 2: Neuroimaging tools and handler dependencies
+FROM neurodebian:nd20.04-non-free AS neuroimaging-stage
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt update && \
+    apt-get update && apt-get upgrade -y
+
+RUN apt update && apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc
+
+RUN pip3 install numpy==1.23.0 nibabel==4.0.0 pandas matplotlib pyyaml==5.4.1 pydicom==2.3.1 natsort pydeface && \
+    pip3 install quickshear mne mne-bids pypet2bids==1.4.1
+
+RUN apt-get install -y build-essential pkg-config cmake git pigz rename zstd libopenjp2-7 libgdcm-tools wget libopenblas-dev && \
+    apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
+
+RUN touch /.pet2bidsconfig && chown 1001:1001 /.pet2bidsconfig
+RUN echo "DEFAULT_METADATA_JSON=/usr/local/lib/python3.8/dist-packages/pypet2bids/template_json.json" > /.pet2bidsconfig
+
+RUN mkdir -p /usr/local/fsl && \
+    git clone https://github.com/dlevitas/FSL_binaries /usr/local/fsl && \
+    rm -rf /usr/local/fsl/README.md && \
+    mkdir -p /usr/local/fsl/data/standard && \
+    mv /usr/local/fsl/bin/MNI152_T1_2mm_brain.nii.gz /usr/local/fsl/data/standard
+
+ENV FSLDIR=/usr/local/fsl
+ENV PATH=$PATH:$FSLDIR/bin
+ENV FSLOUTPUTTYPE=NIFTI_GZ
+
+RUN apt-get update \
+    && apt-get install -y ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+
+ARG NODE_MAJOR=20
+RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+
+RUN apt-get update \
+    && apt-get install nodejs -y
+
+RUN cd /tmp && curl -fLO https://github.com/rordenlab/dcm2niix/releases/latest/download/dcm2niix_lnx.zip \
+    && unzip /tmp/dcm2niix_lnx.zip \
+    && mv dcm2niix /usr/local/bin
+
+RUN mkdir -p /app
+
+# Get bids-specification from github
+RUN cd /app && git clone https://github.com/bids-standard/bids-specification && \
+    cd bids-specification && git checkout 3537e9edbc81545614d3ee605c398361099b6977
+
+#install ROBEX
+ADD https://www.nitrc.org/frs/download.php/5994/ROBEXv12.linux64.tar.gz//?i_agree=1&download_now=1 /
+RUN tar -xzf /ROBEXv12.linux64.tar.gz
+ENV PATH /ROBEX:$PATH
+
+ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
+ENV PATH $NVM_DIR/v$NODE_VERSION/bin:$PATH
+
+#install bids-validator
+RUN npm install -g npm@9.5.1
+RUN npm install -g bids-validator@1.14.8
+RUN git clone https://github.com/bids-standard/bids-validator
+
+# Stage 3: Node.js base for API and UI
+FROM node:20 AS nodejs-stage
+RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch
+
+# Stage 4: Telemetry dependencies
+FROM neurodebian:nd20.04-non-free AS telemetry-stage
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt update && \
+    apt-get update && apt-get upgrade -y
+    
+RUN apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy
+RUN pip3 install --upgrade pip
+RUN pip3 install conversiontelemetry
+
+# Stage 5: Final combined stage
+FROM neurodebian:nd20.04-non-free AS everything
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND noninteractive
+
+# Install system dependencies
+RUN apt update && \
+    apt-get update && apt-get upgrade -y && \
+    apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc \
+    build-essential pkg-config cmake git pigz rename zstd libopenjp2-7 libgdcm-tools wget libopenblas-dev \
+    ca-certificates gnupg supervisor && \
+    apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
+
+# Install Node.js 20
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+
+ARG NODE_MAJOR=20
+RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+
+RUN apt-get update && apt-get install nodejs -y
+
+# Install Python packages
+RUN pip3 install numpy==1.23.0 nibabel==4.0.0 pandas matplotlib pyyaml==5.4.1 pydicom==2.3.1 natsort pydeface && \
+    pip3 install quickshear mne mne-bids pypet2bids==1.4.1 conversiontelemetry
+
+# Install MongoDB
+RUN wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add - && \
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-4.4.list && \
+    apt-get update && \
+    apt-get install -y mongodb-org=4.4.15 mongodb-org-server=4.4.15 mongodb-org-shell=4.4.15 mongodb-org-mongos=4.4.15 mongodb-org-tools=4.4.15
+
+# Install neuroimaging tools
+RUN touch /.pet2bidsconfig && chown 1001:1001 /.pet2bidsconfig
+RUN echo "DEFAULT_METADATA_JSON=/usr/local/lib/python3.8/dist-packages/pypet2bids/template_json.json" > /.pet2bidsconfig
+
+RUN mkdir -p /usr/local/fsl && \
+    git clone https://github.com/dlevitas/FSL_binaries /usr/local/fsl && \
+    rm -rf /usr/local/fsl/README.md && \
+    mkdir -p /usr/local/fsl/data/standard && \
+    mv /usr/local/fsl/bin/MNI152_T1_2mm_brain.nii.gz /usr/local/fsl/data/standard
+
+ENV FSLDIR=/usr/local/fsl
+ENV PATH=$PATH:$FSLDIR/bin
+ENV FSLOUTPUTTYPE=NIFTI_GZ
+
+# Install dcm2niix
+RUN cd /tmp && curl -fLO https://github.com/rordenlab/dcm2niix/releases/latest/download/dcm2niix_lnx.zip \
+    && unzip /tmp/dcm2niix_lnx.zip \
+    && mv dcm2niix /usr/local/bin
+
+# Install ROBEX
+ADD https://www.nitrc.org/frs/download.php/5994/ROBEXv12.linux64.tar.gz//?i_agree=1&download_now=1 /
+RUN tar -xzf /ROBEXv12.linux64.tar.gz
+ENV PATH /ROBEX:$PATH
+
+# Install Node.js global packages
+RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch bids-validator@1.14.8
+
+# Get bids-specification from github
+RUN mkdir -p /app && \
+    cd /app && git clone https://github.com/bids-standard/bids-specification && \
+    cd bids-specification && git checkout 3537e9edbc81545614d3ee605c398361099b6977
+
+# Clone bids-validator
+RUN git clone https://github.com/bids-standard/bids-validator /app/bids-validator
+
+# Copy application code
+COPY . /app
+
+# Generate keys for API
+WORKDIR /app
+RUN ./generate_keys.sh
+
+# Install API dependencies and build
+WORKDIR /app/api
+RUN cp /app/package.json /app/api/ && npm install && npx tsc
+
+# Install handler dependencies and build
+WORKDIR /app/handler
+RUN npm install && npx tsc
+
+# Install UI dependencies
+WORKDIR /app/ui
+RUN npm install
+
+# Copy UI entrypoint
+COPY ui/entrypoint.sh /entrypoint-ui.sh
+RUN chmod +x /entrypoint-ui.sh
+
+# Copy telemetry environment
+COPY telemetry/telemetry.env /root/.telemetry.env
+
+# Create supervisor configuration
+RUN mkdir -p /etc/supervisor/conf.d
+COPY <<EOF /etc/supervisor/conf.d/ezbids.conf
+[supervisord]
+nodaemon=true
+user=root
+
+[program:mongodb]
+command=mongod --bind_ip_all --port 27017
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/mongodb.err.log
+stdout_logfile=/var/log/mongodb.out.log
+
+[program:api]
+command=/app/api/dev.sh
+directory=/app/api
+autostart=true
+autorestart=true
+environment=MONGO_CONNECTION_STRING="mongodb://localhost:27017/ezbids",BRAINLIFE_AUTHENTICATION="false"
+stderr_logfile=/var/log/api.err.log
+stdout_logfile=/var/log/api.out.log
+depends_on=mongodb
+
+[program:handler]
+command=pm2 start handler.js --attach --watch --ignore-watch "ui **/node_modules **__pycache__**"
+directory=/app/handler
+autostart=true
+autorestart=true
+environment=MONGO_CONNECTION_STRING="mongodb://localhost:27017/ezbids",PRESORT="false"
+stderr_logfile=/var/log/handler.err.log
+stdout_logfile=/var/log/handler.out.log
+depends_on=api
+
+[program:ui]
+command=/entrypoint-ui.sh
+directory=/app/ui
+autostart=true
+autorestart=true
+environment=VITE_APIHOST="http://localhost:8082",VITE_BRAINLIFE_AUTHENTICATION="false"
+stderr_logfile=/var/log/ui.err.log
+stdout_logfile=/var/log/ui.out.log
+depends_on=api
+
+[program:telemetry]
+command=start-telemetry
+autostart=false
+autorestart=true
+stderr_logfile=/var/log/telemetry.err.log
+stdout_logfile=/var/log/telemetry.out.log
+depends_on=mongodb
+EOF
+
+# Create necessary directories
+RUN mkdir -p /data/db /var/log /tmp/ezbids-workdir
+
+# Expose ports
+EXPOSE 27017 8082 3000 8000
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=10s --retries=5 --start-period=30s \
+    CMD curl -f http://localhost:8082/health || exit 1
+
+# Start all services with supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/ezbids.conf"]
+
+
+# run with docker run -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp ezbids-everything
