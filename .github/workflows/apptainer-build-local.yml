@@ -1,4 +1,4 @@
-name: Test Local Upload
+name: Test Apptainer Build Local
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  Test-Local-Uploads:
+  Test-Apptainer-Local-Uploads-and-Build:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
@@ -81,6 +81,12 @@ jobs:
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
+          # remove the tar files
+          rm mongo.tar api.tar handler.tar ui.tar
+
+
+      - name: Clean Up some More Space
+        run: bash .github/scripts/util_free_space.sh
 
       - name: Setup Apptainer
         run: |
