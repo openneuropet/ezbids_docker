@@ -81,9 +81,6 @@ jobs:
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
           docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
-          # remove the tar files
-          rm mongo.tar api.tar handler.tar ui.tar
-
 
       - name: Clean Up some More Space
         run: bash .github/scripts/util_free_space.sh
