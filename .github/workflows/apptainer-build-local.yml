@@ -105,7 +105,7 @@ jobs:
 
       - name: Run Apptainer Image
         run: |
-          nohup apptainer run --fakeroot --writable-tmpfs --cleanenv --no-home ezbids-everything.sif 2>&1 &
+          apptainer instance start --fakeroot --writable-tmpfs --cleanenv --no-home ezbids-everything.sif ezbids-everything
 
       - name: Install uv
         run: |
