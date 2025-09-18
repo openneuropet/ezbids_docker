@@ -113,7 +113,7 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
-        run: uv --versioni
+        run: uv --version
 
       - name: Verify Apptainer image is running
         run: |
