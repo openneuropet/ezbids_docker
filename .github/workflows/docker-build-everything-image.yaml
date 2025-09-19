@@ -1,0 +1,105 @@
+name: Test Docker Build Everything Image
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_run:
+    workflows: ["Docker Build (Local)"]
+    types:
+      - completed
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  Test-Docker-Build-Everything-Image:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    env:
+      COMPOSE_FILE: ./docker-compose.yml
+      REGISTRY_PREFIX: docker.io/library
+      SERVER_NAME: localhost
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true  # Ensure we get the submodule info
+
+      - name: Set repository name
+        run: echo "REPO_NAME=$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
+
+      - name: Cache test data
+        uses: actions/cache@v4
+        id: test-data-cache
+        with:
+          path: test/test_data
+          key: test-data-${{ hashFiles('.gitmodules') }}
+          restore-keys: |
+            test-data-
+
+      - name: Get test data if not cached
+        if: steps.test-data-cache.outputs.cache-hit != 'true'
+        run: |
+          make get-test-data
+
+      - name: Cache Docker images
+        uses: actions/cache@v4
+        id: docker-cache
+        with:
+          path: |
+            mongo.tar
+            api.tar
+            handler.tar
+            ui.tar
+          key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
+          restore-keys: |
+            docker-local-images-
+
+      - name: Setup environment
+        run: |
+          # copy the example.env to .env
+          cp example.env .env
+
+          # Update .env to use the hostname
+          sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost/" .env
+
+      - name: Build or load images
+        run: |
+          if [ -f mongo.tar ] && [ -f api.tar ] && [ -f handler.tar ] && [ -f ui.tar ]; then
+            echo "Loading cached images..."
+            if ! docker load < mongo.tar || ! docker load < api.tar || ! docker load < handler.tar || ! docker load < ui.tar; then
+              echo "Failed to load cached images, building instead..."
+              docker compose -f ${{ env.COMPOSE_FILE }} build
+            else
+              rm mongo.tar api.tar handler.tar ui.tar
+            fi
+          else
+            echo "Building images..."
+            docker compose -f ${{ env.COMPOSE_FILE }} build
+          fi
+          
+          # Tag the images to match docker-compose
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
+          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
+
+      - name: Build Single Docker Image
+        run: |
+          docker build -f EverythingDockerfile -t ezbids-everything .
+
+      - name: Start Services
+        run: |
+          docker run -d -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp ezbids-everything       
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Verify uv installation
+        run: uv --version
+
+      - name: Run upload test
+        run: |
+          make test-upload
+
+      
+
