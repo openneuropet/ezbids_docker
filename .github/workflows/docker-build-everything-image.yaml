@@ -68,7 +68,7 @@ jobs:
 
       - name: Start Services
         run: |
-          docker run -d -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp ezbids-everything       
+          docker run -d -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp openneuropet/ezbids-everything
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
