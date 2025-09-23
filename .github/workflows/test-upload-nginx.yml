@@ -107,29 +107,6 @@ jobs:
             docker compose -f ${{ env.COMPOSE_FILE }} build
           fi
           
-
-      - name: Save nginx images to cache
-        run: |
-          # Save nginx-specific images for future use
-          docker save mongo:4.4.15 > mongo.tar
-          docker save openneuropet/ezbids-api:latest > api.tar
-          docker save openneuropet/ezbids-handler:latest > handler.tar
-          docker save openneuropet/ezbids-ui-nginx:latest > ui-nginx.tar
-          docker save nginx:latest > nginx.tar
-
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-            ui-nginx.tar
-            nginx.tar
-          key: test-nginx-docker-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            test-nginx-docker-images-
-
       - name: Do additional Nginx setup
         run: |
           # create self signed certs using the hostname

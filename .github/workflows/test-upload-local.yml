@@ -80,26 +80,6 @@ jobs:
           fi
           
 
-      - name: Save images to cache
-        run: |
-          # Save images for future use
-          docker save mongo:4.4.15 > mongo.tar
-          docker save openneuropet/ezbids-api:latest > api.tar
-          docker save openneuropet/ezbids-handler:latest > handler.tar
-          docker save openneuropet/ezbids-ui:latest > ui.tar
-
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-            ui.tar
-          key: test-local-docker-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            test-local-docker-images-
-
       - name: Start services
         run: |
           # Create and set permissions for temp directory
