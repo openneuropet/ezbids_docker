@@ -3,7 +3,7 @@ networks:
 
 services:
     mongodb:
-        container_name: openneuropet/ezbids-mongodb
+        container_name: ezbids-mongodb
         image: mongo:4.4.15
         platform: linux/amd64
         volumes:
@@ -18,7 +18,7 @@ services:
             - ezbids
 
     api:
-        container_name: openneuropet/ezbids-api
+        container_name: ezbids-api
         image: openneuropet/ezbids-api:${EZBIDS_VERSION:-latest}
         build: 
             context: .
@@ -43,7 +43,7 @@ services:
             - ezbids
 
     handler:
-        container_name: openneuropet/ezbids-handler
+        container_name: ezbids-handler
         image: openneuropet/ezbids-handler:${EZBIDS_VERSION:-latest}
         build:
             context: .
@@ -70,7 +70,7 @@ services:
     ui:
         # we only run this container to build the UI pages to mount into a volume
         # for use in the nginx container.
-        container_name: openneuropet/ezbids-ui-builder
+        container_name: ezbids-ui-builder
         image: openneuropet/ezbids-ui-nginx:${EZBIDS_VERSION:-latest}
         build: 
             context: ./ui/
@@ -89,7 +89,7 @@ services:
 
     # by default this is not enabled, add COMPOSE_PROFILES=telemetry to your .env
     telemetry:
-        container_name: openneuropet/ezbids-telemetry
+        container_name: ezbids-telemetry
         build: 
             context: ./telemetry
             tags: 
@@ -103,7 +103,7 @@ services:
             - ezbids
 
     nginx:
-        container_name: openneuropet/ezbids-nginx
+        container_name: ezbids-nginx
         depends_on:
             - ui
             - api
