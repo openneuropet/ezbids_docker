@@ -1,6 +1,8 @@
 name: Test Local Upload
 
 on:
+  push:
+    branches: [ master ]
   pull_request:
     branches: [ master ]
   workflow_run:
@@ -103,3 +105,9 @@ jobs:
       - name: Run upload test
         run: |
           make test-upload
+
+      - name: Push Images
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+        run: |
+          docker login ${{ secrets.DOCKER_USERNAME }} ${{ secrets.DOCKER_PASSWORD }}
+          make docker-local-push
