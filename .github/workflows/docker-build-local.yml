@@ -32,9 +32,9 @@ jobs:
         run: |
           # Save images to tar files
           docker save mongo > mongo.tar
-          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest > api.tar
-          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest > handler.tar
-          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui.tar
+          docker save openneuropet/ezbids-api:latest > api.tar
+          docker save openneuropet/ezbids-handler:latest > handler.tar
+          docker save openneuropet/ezbids-ui:latest > ui.tar
 
       - name: Cache Docker images
         uses: actions/cache@v4

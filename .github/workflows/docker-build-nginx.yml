@@ -59,7 +59,7 @@ jobs:
       - name: Save images
         run: |
           # Save all ui and nginx images to tar files
-          docker save ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest > ui-nginx.tar
+          docker save openneuropet/ezbids-ui-nginx:latest > ui-nginx.tar
           docker save nginx > nginx.tar
 
       - name: Cache Nginx images
