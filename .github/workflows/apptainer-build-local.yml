@@ -1,6 +1,8 @@
 name: Test Apptainer Build Local
 
 on:
+  push:
+    branches: [ master ]
   pull_request:
     branches: [ master ]
   workflow_run:
@@ -41,19 +43,6 @@ jobs:
         run: |
           make get-test-data
 
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        id: docker-cache
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-            ui.tar
-          key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            docker-local-images-
-
       - name: Setup environment
         run: |
           # copy the example.env to .env
@@ -61,26 +50,7 @@ jobs:
 
           # Update .env to use the hostname
           sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost/" .env
-
-      - name: Build or load images
-        run: |
-          if [ -f mongo.tar ] && [ -f api.tar ] && [ -f handler.tar ] && [ -f ui.tar ]; then
-            echo "Loading cached images..."
-            if ! docker load < mongo.tar || ! docker load < api.tar || ! docker load < handler.tar || ! docker load < ui.tar; then
-              echo "Failed to load cached images, building instead..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build
-            else
-              rm mongo.tar api.tar handler.tar ui.tar
-            fi
-          else
-            echo "Building images..."
-            docker compose -f ${{ env.COMPOSE_FILE }} build
-          fi
           
-          # Tag the images to match docker-compose
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
 
       - name: Clean Up some More Space
         run: bash .github/scripts/util_free_space.sh
@@ -135,4 +105,9 @@ jobs:
             exit 1
           fi
       
+      - name: Push Images
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+        run: |
+          docker login ${{ secrets.DOCKER_USERNAME }} ${{ secrets.DOCKER_PASSWORD }}
+          make docker-push-everything
 
