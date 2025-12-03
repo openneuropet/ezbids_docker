@@ -459,10 +459,13 @@ export default defineComponent({
                     if (!this.failed.includes(i)) this.failed.push(i);
                     continue; //TODO we should abort upload?
                 }
-                batchSize += file.size;
+                // Check if adding this file would exceed the 1GB limit
+                // If we already have files in the batch and adding this would exceed 1GB, start a new batch
+                // If this is the first file in a batch, include it even if it's > 1GB (can't split a single file)
+                const wouldExceedLimit = fileidx.length > 0 && (batchSize + file.size > 1024 * 1024 * 1024);
+                if (wouldExceedLimit) break;
 
-                //limit batch size (3000 files causes network error - probably too many?)
-                if (fileidx.length > 0 && (fileidx.length >= 500 || batchSize > 1024 * 1014 * 300)) break;
+                batchSize += file.size;
 
                 //let's proceed!
                 file.uploading = true;
@@ -525,9 +528,12 @@ export default defineComponent({
                     });
 
                 //see how many batches we are currently uploading
+                // Read from env var VITE_UPLOAD_CONCURRENT_BATCHES, default to 4
+                const maxConcurrentBatches = parseInt(import.meta.env.VITE_UPLOAD_CONCURRENT_BATCHES || '4', 10);
                 let uploadingBatches = this.batches.filter((b) => b.status == 'uploading');
-                if (uploadingBatches.length < 4) {
-                    setTimeout(this.processFiles, 1000 * 3);
+                if (uploadingBatches.length < maxConcurrentBatches) {
+                    // Start next batch immediately if under limit
+                    this.processFiles();
                 }
             }
 
