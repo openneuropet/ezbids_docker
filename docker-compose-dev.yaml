@@ -1,0 +1,124 @@
+version: "3"
+networks:
+    ezbids:
+
+services:
+    mongodb:
+        container_name: ezbids-mongodb
+        image: mongo:4.4.15
+        platform: linux/amd64
+        volumes:
+            - /data/db
+        healthcheck:
+            test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+            interval: 10s
+            timeout: 10s
+            retries:
+                5
+        ports:
+            - 27417:27017 #for local debugging
+        networks:
+            - ezbids
+
+    api:
+        container_name: ezbids-api
+        image: openneuropet/ezbids-api:${EZBIDS_VERSION:-latest}
+        build: 
+            context: .
+            tags: 
+                - openneuropet/ezbids-api:latest
+                - openneuropet/ezbids-api:${EZBIDS_VERSION:-latest}
+        platform: linux/amd64
+        volumes:
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir/}:/tmp
+        depends_on:
+            mongodb:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+            interval: 10s
+            timeout: 10s
+            retries: 5
+            start_period: 30s
+        working_dir: /app/api
+        command:
+            ./dev.sh
+        environment:
+            MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
+            BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
+        ports:
+            - 8082:8082 #localhost runs on local browser to it needs to access api via host port
+        networks:
+            - ezbids
+
+    handler:
+        container_name: ezbids-handler
+        image: openneuropet/ezbids-handler:${EZBIDS_VERSION:-latest}
+        build:
+            context: .
+            tags: 
+                - openneuropet/ezbids-handler:latest
+                - openneuropet/ezbids-handler:${EZBIDS_VERSION:-latest}
+            dockerfile: handler/Dockerfile
+        platform: linux/amd64
+        volumes:
+            - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
+        depends_on:
+            mongodb:
+                condition: service_healthy
+            api:
+                condition: service_healthy
+        environment:
+            MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
+            PRESORT: ${PRESORT:-false}
+        networks:
+            - ezbids
+        tty: true #turn on color for bids-validator output
+        command: pm2 start handler.js --attach --watch --ignore-watch "ui **/node_modules **__pycache__**"
+
+    ui:
+        container_name: ezbids-ui
+        image: openneuropet/ezbids-ui:${EZBIDS_VERSION:-latest}
+        build: 
+            context: ./ui
+            tags: 
+                - openneuropet/ezbids-ui:latest
+                - openneuropet/ezbids-ui:${EZBIDS_VERSION:-latest}
+        platform: linux/amd64
+        environment:
+            VITE_APIHOST: http://${SERVER_NAME:-localhost}:8082
+            VITE_BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
+        depends_on:
+            - api
+            - mongodb
+            - handler
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3000"]
+            interval: 10s
+            timeout: 10s
+            retries: 5
+            start_period: 30s
+        ports:
+            - 3000:3000 #vite wants to be exposed on the host for HMR?
+        networks:
+            - ezbids
+        volumes:
+            # Mount local ui source for live development
+            - ./ui/src:/ui/src
+            - ./ui/public:/ui/public
+            - ./ui/index.html:/ui/index.html
+            - ./ui/vite.config.ts:/ui/vite.config.ts
+
+    # by default this is not enabled, need to run docker compose with --profile development to enable this service
+    telemetry:
+        container_name: ezbids-telemetry
+        build: ./telemetry
+        platform: linux/amd64
+        depends_on:
+            - mongodb
+        profiles: ["telemetry"]
+        ports:
+            - 8000:8000 #for local debugging
+        networks:
+            - ezbids
+
