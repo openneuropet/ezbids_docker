@@ -2,7 +2,7 @@
     <div style="padding: 20px">
         <div v-if="!session">
             <p>
-                Welcome to <b><span style="letter-spacing: -2px; opacity: 0.5">ez</span>BIDS</b> - an online imaging
+                Welcome BOO! to <b><span style="letter-spacing: -2px; opacity: 0.5">ez</span>BIDS</b> - an online imaging
                 data to BIDS conversion / organizing tool.
             </p>
 
@@ -267,10 +267,11 @@ export default defineComponent({
 
             total_size: null,
             ignoreCount: 0,
-            files: [] /*: FileList*/, //files to be uploaded
+            pendingFiles: new Set() /*: FileList*/, //files to be uploaded
+            failedFiles: new Set()
 
             uploaded: [], //index of files that are successfully uploaded
-            failed: [], //index of files failed to upload
+            //failed: [], //index of files failed to upload
 
             batches: [], //object containing information for each batch upload {evt, fileidx}
 
@@ -297,6 +298,10 @@ export default defineComponent({
     },
 
     methods: {
+        //async function getDirLocal() {
+        //    const dirHandle = await window.showDirectoryPicker();
+        //    return dirHandle
+        //},
         async downloadFile(fileName) {
             if (!fileName) return;
             try {
@@ -360,6 +365,19 @@ export default defineComponent({
                 this.upload();
             }, 1000);
         },
+
+        async selectDirectory() {
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                this.starting = true;
+                this.pendingFiles = new Set();
+                await this.collectHandles(dirHandle, dirHandle.name);
+                this.upload();
+            } catch (err) {
+                if (err.name !== 'AbortError') console.error(err);
+            }
+        }
+
 
         // Unlike file input(directory) selector, I have to do some convoluted thing to get all the files that user drops...
         async listDropFiles(items) {
