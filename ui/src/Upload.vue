@@ -2,39 +2,25 @@
     <div style="padding: 20px">
         <div v-if="!session">
             <p>
-                Welcome BOO! to <b><span style="letter-spacing: -2px; opacity: 0.5">ez</span>BIDS</b> - an online imaging
+                Welcome to <b><span style="letter-spacing: -2px; opacity: 0.5">ez</span>BIDS</b> - an online imaging
                 data to BIDS conversion / organizing tool.
             </p>
 
             <div v-if="!starting">
-                <div
-                    class="drop-area"
-                    :class="{ dragging }"
-                    @drop="dropit"
-                    @dragleave="dragging = false"
-                    @dragover="dragover"
-                >
-                    <div class="drop-area-backdrop">
+                <div class="select-area">
+                    <div class="select-area-backdrop">
                         <b><span style="letter-spacing: -4vh">ez</span>BIDS</b>
                     </div>
                     <div>
-                        <b>Drag & Drop DICOM (or dcm2niix) data here to start</b>
+                        <b>Select a folder containing DICOM (or dcm2niix) data</b>
                         <br />
                         <br />
-                        or
+                        <el-button type="primary" size="large" @click="selectDirectory">
+                            Select Directory
+                        </el-button>
                         <br />
                         <br />
-                        <input
-                            type="file"
-                            webkitdirectory
-                            mozdirectory
-                            msdirectory
-                            odirectory
-                            directory
-                            multiple
-                            style="font-size: 80%; width: 400px; background-color: #fff3; padding: 5px"
-                            @change="selectit"
-                        />
+                        <small style="opacity: 0.7">Requires Chrome or Edge browser</small>
                     </div>
                 </div>
 
@@ -85,30 +71,29 @@
                     <font-awesome-icon icon="spinner" pulse />
                 </h3>
                 <small>Please do not close or refresh this page until all files are uploaded.</small>
-                <div v-if="failed.length > 0">
+                <div v-if="failedFiles.length > 0">
                     <el-alert type="error"
                         >Permanently failed to upload some files, please email pestilli@utexas.edu for
                         assistance</el-alert
                     >
-                    <pre v-for="idx in failed" :key="idx" type="info" style="font-size: 80%">{{ files[idx].path }}</pre>
+                    <pre v-for="(entry, idx) in failedFiles" :key="idx" type="info" style="font-size: 80%">{{ entry.path }}</pre>
                 </div>
 
                 <p>
-                    <small>Total size {{ formatNumber(total_size / (1024 * 1024)) }} MB</small>
-                    <small> | {{ files.length }} Files </small>
-                    <small> ({{ uploaded.length }} uploaded) </small>
-                    <small v-if="ignoreCount > 0">({{ ignoreCount }} ignored) </small>
+                    <small>Uploaded {{ formatNumber(uploadedSize / (1024 * 1024)) }} MB</small>
+                    <small> | {{ totalFiles }} Files </small>
+                    <small> ({{ uploadedCount }} uploaded) </small>
                     <el-progress
                         status="success"
                         :text-inside="true"
                         :stroke-width="24"
-                        :percentage="parseFloat(((uploaded.length / files.length) * 100).toFixed(1))"
+                        :percentage="uploadProgress"
                     />
                 </p>
                 <div v-for="(batch, idx) in batches" :key="idx">
                     <div v-if="batch.status != 'done'" class="batch-stat">
                         <b style="text-transform: uppercase">{{ batch.status }}</b>
-                        batch {{ (idx + 1).toString() }}. {{ batch.fileidx.length }} files
+                        batch {{ (idx + 1).toString() }}. {{ batch.entries.length }} files
                         <span> ({{ formatNumber(batch.size / (1024 * 1024)) }} MB) </span>
                         <div style="height: 20px">
                             <el-progress
@@ -232,14 +217,6 @@
                     <el-button type="info" style="width: 168px" size="mini" @click="dump">Dump state</el-button>
                     <br />
 
-                    <div v-if="ignoredFiles.length">
-                        <b>Ignored Files</b>
-                        <ul>
-                            <li v-for="(file, idx) in ignoredFiles" :key="idx">
-                                <pre>{{ file.path }}</pre>
-                            </li>
-                        </ul>
-                    </div>
                 </el-collapse-item>
             </el-collapse>
             <br />
@@ -262,21 +239,18 @@ export default defineComponent({
     },
     data() {
         return {
-            dragging: false,
-            starting: false, //wait for browser to handle all files
+            starting: false,
 
-            total_size: null,
-            ignoreCount: 0,
-            pendingFiles: new Set() /*: FileList*/, //files to be uploaded
-            failedFiles: new Set()
+            // File System Access API - stores { handle, path, retries }
+            pendingFiles: new Set(),
+            failedFiles: [],
+            uploadedCount: 0,
+            totalFiles: 0,
+            uploadedSize: 0, // calculated lazily as batches complete
 
-            uploaded: [], //index of files that are successfully uploaded
-            //failed: [], //index of files failed to upload
-
-            batches: [], //object containing information for each batch upload {evt, fileidx}
+            batches: [], // { entries, evt, status, size }
 
             opened: [],
-
             doneUploading: false,
 
             activeLogs: [],
@@ -287,21 +261,13 @@ export default defineComponent({
     computed: {
         ...mapState(['session', 'config', 'ezbids']),
 
-        ignoredFiles() {
-            let files = [];
-            for (let i = 0; i < this.files.length; ++i) {
-                let file = this.files[i];
-                if (file.ignore) files.push(file);
-            }
-            return files;
+        uploadProgress() {
+            if (this.totalFiles === 0) return 0;
+            return parseFloat(((this.uploadedCount / this.totalFiles) * 100).toFixed(1));
         },
     },
 
     methods: {
-        //async function getDirLocal() {
-        //    const dirHandle = await window.showDirectoryPicker();
-        //    return dirHandle
-        //},
         async downloadFile(fileName) {
             if (!fileName) return;
             try {
@@ -336,125 +302,39 @@ export default defineComponent({
             return null;
         },
 
-        //HTML5 drop event doesn't work unless dragover is handled
-        dragover(e /*: DragEvent*/) {
-            e.preventDefault();
-            this.dragging = true;
-        },
-
-        async dropit(e /*: DragEvent*/) {
-            e.preventDefault();
-            this.dragging = false;
-            this.starting = true;
-
-            //I can't wrap this around timeout because chrome won't allow accessing dataTransfer.items outside dropevent context for security reason
-            await this.listDropFiles(e.dataTransfer?.items);
-            this.upload();
-        },
-
-        selectit(e /*: Event*/) {
-            const target = e.target; /* as HTMLInputElement*/
-            this.files = target.files /* as FileList*/;
-
-            this.starting = true;
-            //this.$nextTick() won't update the UI with starting flag change
-            setTimeout(() => {
-                for (let file of this.files) {
-                    file.path = file.webkitRelativePath;
-                }
-                this.upload();
-            }, 1000);
-        },
-
         async selectDirectory() {
             try {
                 const dirHandle = await window.showDirectoryPicker();
                 this.starting = true;
                 this.pendingFiles = new Set();
+                this.failedFiles = [];
+                this.uploadedCount = 0;
+                this.uploadedSize = 0;
+                this.batches = [];
                 await this.collectHandles(dirHandle, dirHandle.name);
-                this.upload();
+                this.totalFiles = this.pendingFiles.size;
+                this.startUpload();
             } catch (err) {
                 if (err.name !== 'AbortError') console.error(err);
             }
-        }
+        },
 
-
-        // Unlike file input(directory) selector, I have to do some convoluted thing to get all the files that user drops...
-        async listDropFiles(items) {
-            this.files = [];
-
-            // Get all the entries (files or sub-directories) in a directory
-            // by calling readEntries until it returns empty array
-            async function readAllDirectoryEntries(directoryReader) {
-                let entries = [];
-                //console.log("reading directory entries");
-                let readEntries = await readEntriesPromise(directoryReader);
-                while (readEntries.length > 0) {
-                    entries.push(...readEntries);
-                    readEntries = await readEntriesPromise(directoryReader);
-                }
-                return entries;
-            }
-
-            // Wrap readEntries in a promise to make working with readEntries easier
-            // readEntries will return only some of the entries in a directory
-            // e.g. Chrome returns at most 100 entries at a time
-            async function readEntriesPromise(directoryReader) /*: Promise<File[]>*/ {
-                try {
-                    return await new Promise((resolve, reject) => {
-                        directoryReader.readEntries(resolve, reject);
-                    });
-                } catch (err) {
-                    console.error(err);
+        async collectHandles(dirHandle, basePath) {
+            for await (const entry of dirHandle.values()) {
+                const path = `${basePath}/${entry.name}`;
+                if (entry.kind === 'file') {
+                    this.pendingFiles.add({ handle: entry, path, retries: 0 });
+                } else if (entry.kind === 'directory') {
+                    await this.collectHandles(entry, path);
                 }
             }
+        },
 
-            async function getFile(fileEntry) /*: Promise<File>*/ {
-                try {
-                    return await new Promise((resolve, reject) => fileEntry.file(resolve, reject));
-                } catch (err) {
-                    console.error(err);
-                }
-            }
-
-            //https://stackoverflow.com/questions/3590058/does-html5-allow-drag-drop-upload-of-folders-or-a-folder-tree
-            // Drop handler function to get all files
-            let queue = [];
-            for (let i = 0; i < items.length; i++) {
-                queue.push(items[i].webkitGetAsEntry());
-            }
-
-            // Unfortunately dataTransferItemList is not iterable i.e. no forEach
-            while (queue.length > 0) {
-                let entry = queue.shift();
-                if (entry.isFile) {
-                    let file = await getFile(entry);
-                    // @ts-ignore (we add path variable to store the fullpath)
-                    file.path = entry.fullPath.substring(1); //remove / prefix
-                    this.files.push(file);
-                } else if (entry.isDirectory) {
-                    queue.push(...(await readAllDirectoryEntries(entry.createReader())));
-                }
-            }
-        }, //end listDropFiles()
-
-        async upload() {
+        async startUpload() {
             this.starting = false;
             this.doneUploading = false;
 
-            //calculate total file size
-            this.total_size = 0;
-            for (let i = 0; i < this.files.length; ++i) {
-                let file = this.files[i];
-                this.total_size += file.size;
-            }
-
-            //reset try counters
-            for (let i = 0; i < this.files.length; ++i) {
-                this.files[i].try = 0;
-            }
-
-            //create new session
+            // Create new session
             const res = await axios.post(`${this.config.apihost}/session`, {
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -462,118 +342,110 @@ export default defineComponent({
             this.processFiles();
         },
 
-        processFiles() {
-            //find next files to upload
-            let data = new FormData();
-            let fileidx = [];
+        async processFiles() {
+            // Build a batch from pending files (lazy file access)
+            const data = new FormData();
+            const batchEntries = [];
             let batchSize = 0;
 
-            for (let i = 0; i < this.files.length; ++i) {
-                let file = this.files[i];
-                if (this.uploaded.includes(i)) continue;
-                if (file.uploading) continue;
-                if (file.ignore) continue;
-                if (file.try > 5) {
-                    if (!this.failed.includes(i)) this.failed.push(i);
-                    continue; //TODO we should abort upload?
+            for (const entry of this.pendingFiles) {
+                if (entry.uploading) continue;
+                if (entry.retries > 5) {
+                    this.pendingFiles.delete(entry);
+                    this.failedFiles.push(entry);
+                    continue;
                 }
+
+                // Get the actual File object only now (lazy access)
+                const file = await entry.handle.getFile();
                 batchSize += file.size;
 
-                //limit batch size (3000 files causes network error - probably too many?)
-                if (fileidx.length > 0 && (fileidx.length >= 500 || batchSize > 1024 * 1014 * 300)) break;
+                // Limit batch size
+                if (batchEntries.length > 0 && (batchEntries.length >= 500 || batchSize > 1024 * 1024 * 300)) break;
 
-                //let's proceed!
-                file.uploading = true;
-                fileidx.push(i);
+                entry.uploading = true;
+                entry.file = file; // Store for retry if needed
+                batchEntries.push(entry);
                 data.append('files', file);
-
-                //file doesn't contains the real path and lastModifiedDate. I need to pass this separately
-                data.append('paths', file.path);
+                data.append('paths', entry.path);
                 data.append('mtimes', file.lastModified);
             }
 
-            if (fileidx.length == 0) {
+            if (batchEntries.length === 0) {
                 return;
             }
 
-            //prepare a batch
-            let batch = { fileidx, evt: {}, status: 'uploading', size: batchSize };
+            const batch = { entries: batchEntries, evt: {}, status: 'uploading', size: batchSize };
             this.batches.push(batch);
 
-            function doSend() {
+            const doSend = () => {
                 axios
                     .post(this.config.apihost + '/upload-multi/' + this.session._id, data, {
                         onUploadProgress: (evt) => {
-                            //count++;
                             batch.evt = evt;
                         },
                     })
                     .then((res) => {
-                        let msg = res.data;
-                        if (msg == 'ok') {
+                        if (res.data === 'ok') {
                             batch.status = 'done';
-                            fileidx.forEach((idx) => {
-                                this.uploaded.push(idx);
-                            });
+                            // Remove successfully uploaded entries from Set
+                            for (const entry of batchEntries) {
+                                this.pendingFiles.delete(entry);
+                                this.uploadedCount++;
+                                this.uploadedSize += entry.file.size;
+                            }
 
-                            if (this.uploaded.length + this.ignoreCount == this.files.length) {
+                            if (this.pendingFiles.size === 0) {
                                 this.done();
                             } else {
-                                //handle next batch
                                 this.processFiles();
                             }
                         } else {
-                            //server side error?
                             batch.status = 'failed';
                             console.error(res);
                         }
                     })
                     .catch((err) => {
                         batch.status = 'failed';
-                        //retry these files on a different batch
-                        fileidx.forEach((idx) => {
-                            this.files[idx].try++;
-                        });
-                        setTimeout(this.processFiles, 1000 * 13);
+                        // Mark for retry
+                        for (const entry of batchEntries) {
+                            entry.retries++;
+                            entry.uploading = false;
+                        }
+                        setTimeout(() => this.processFiles(), 1000 * 13);
                     })
                     .then(() => {
-                        fileidx.forEach((idx) => {
-                            this.files[idx].uploading = false;
-                        });
+                        for (const entry of batchEntries) {
+                            entry.uploading = false;
+                        }
                     });
 
-                //see how many batches we are currently uploading
-                let uploadingBatches = this.batches.filter((b) => b.status == 'uploading');
+                // Start more batches if under limit
+                const uploadingBatches = this.batches.filter((b) => b.status === 'uploading');
                 if (uploadingBatches.length < 4) {
-                    setTimeout(this.processFiles, 1000 * 3);
+                    setTimeout(() => this.processFiles(), 1000 * 3);
                 }
-            }
+            };
 
-            doSend.call(this);
+            doSend();
         },
 
         async done() {
-            //we have multiple files uploading concurrently, so the last files will could make this call back
             if (this.doneUploading) return;
             this.doneUploading = true;
 
-            //mark the session as uploaded
+            // Mark the session as uploaded
             await axios.patch(`${this.config.apihost}/session/uploaded/${this.session._id}`, {
                 headers: { 'Content-Type': 'application/json' },
             });
 
-            //construct a good dataset description from the file paths
-            const f = this.files[0];
-            if (f) {
-                const tokens = f.path.split('/'); //027_S_5093/HighResHippo/2017-04-28_12_48_14.0/S...
+            // Construct dataset description from first uploaded path
+            if (this.batches.length > 0 && this.batches[0].entries.length > 0) {
+                const firstPath = this.batches[0].entries[0].path;
+                const tokens = firstPath.split('/');
                 const desc = tokens[0];
                 this.$store.state.ezbids.datasetDescription.Name = desc;
             }
-        },
-
-        loadedPercentage(file_id) {
-            let file = this.files[file_id];
-            return ((file.loaded / file.size) * 100).toFixed(1);
         },
 
         isValid(cb) {
@@ -617,7 +489,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.drop-area {
+.select-area {
     z-index: 0;
     background-color: #0002;
     color: #999;
@@ -631,11 +503,7 @@ export default defineComponent({
     overflow: hidden;
     text-align: center;
 }
-.drop-area.dragging {
-    background-color: #999;
-    color: white;
-}
-.drop-area-backdrop {
+.select-area-backdrop {
     position: absolute;
     font-size: 25vh;
     opacity: 0.1;
