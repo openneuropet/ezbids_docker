@@ -63,6 +63,20 @@ services:
         platform: linux/amd64
         volumes:
             - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir}:/tmp
+            # Mount local handler source for live development
+            - ./handler/ezBIDS_core:/app/handler/ezBIDS_core
+            - ./handler/preprocess.sh:/app/handler/preprocess.sh
+            - ./handler/bids.sh:/app/handler/bids.sh
+            - ./handler/deface.sh:/app/handler/deface.sh
+            - ./handler/expand.sh:/app/handler/expand.sh
+            - ./handler/start.sh:/app/handler/start.sh
+            - ./handler/find_img_data.py:/app/handler/find_img_data.py
+            - ./handler/convert_meg.py:/app/handler/convert_meg.py
+            - ./handler/make_deface_list.py:/app/handler/make_deface_list.py
+            - ./handler/presort_dicoms.py:/app/handler/presort_dicoms.py
+            - ./handler/telemetry.py:/app/handler/telemetry.py
+            - ./handler/handler.ts:/app/handler/handler.ts
+            - ./handler/convert.ts:/app/handler/convert.ts
         depends_on:
             mongodb:
                 condition: service_healthy
