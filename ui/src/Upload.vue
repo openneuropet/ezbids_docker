@@ -356,15 +356,20 @@ export default defineComponent({
                     continue;
                 }
 
+                // Mark as uploading BEFORE any async operation to prevent race condition
+                entry.uploading = true;
+
                 // Get the actual File object only now (lazy access)
                 const file = await entry.handle.getFile();
+                entry.file = file; // Store for retry if needed
                 batchSize += file.size;
 
-                // Limit batch size
-                if (batchEntries.length > 0 && (batchEntries.length >= 500 || batchSize > 1024 * 1024 * 300)) break;
+                // Limit batch size - if exceeded, release entry for next batch
+                if (batchEntries.length > 0 && (batchEntries.length >= 500 || batchSize > 1024 * 1024 * 300)) {
+                    entry.uploading = false;
+                    break;
+                }
 
-                entry.uploading = true;
-                entry.file = file; // Store for retry if needed
                 batchEntries.push(entry);
                 data.append('files', file);
                 data.append('paths', entry.path);
