@@ -98,6 +98,7 @@ if [ $bids_compliant == "true" ]; then
     
     # find products (NIfTI files)
     (cd $root && find . -maxdepth 9 -type f \( -name "*.nii.gz" \) > $root/list)
+    (cd $root && find . -maxdepth 9 -type f \( -name "*.nii" \) >> $root/list)
     (cd $root && find . -maxdepth 9 -type f \( -name "*blood.json" \) >> $root/list)
 
     echo "running ezBIDS_core (may take several minutes, depending on size of data)"
@@ -107,7 +108,7 @@ else
     # If there are .nii files, compress them to .nii.gz
     echo "Making sure all NIfTI files are in .nii.gz format"
     touch $root/nii_files
-    find $root -name "*.nii" > $root/nii_files
+    find $root -maxdepth 9 -type f \( -name "*.nii" \) > $root/nii_files
     [ -s $root/nii_files ] && gzip --force $(cat $root/nii_files)
 
     echo "processing $root"
@@ -236,7 +237,7 @@ else
     fi
 
     # Add all transformed data (e.g. NIfTI or MEG formats) to the list file
-    (cd $root && find . -maxdepth 9 -type f \( -name "*.nii.gz" \) > $root/list)
+    (cd $root && find . -maxdepth 9 -type f \( -name "*.nii*" \) > $root/list)
     (cd $root && find . -maxdepth 9 -type f \( -name "*blood.json" \) >> $root/list)
 
     if [ -f $root/meg.list ]; then
@@ -261,7 +262,7 @@ else
     fi
 
     # Remove .nii files that are randomly created somehow. Don't need them, as actual files are in .nii.gz format
-    (cd $root && find . -type f -name "*.nii" -exec rm {} \;)
+    #(cd $root && find . -type f -name "*.nii" -exec rm {} \;)
 
     echo "running ezBIDS_core (may take several minutes, depending on size of data)"
     python3 "./ezBIDS_core/ezBIDS_core.py" $root
