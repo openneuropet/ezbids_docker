@@ -27,23 +27,3 @@ jobs:
 
       - name: Build services
         run: docker compose -f ${{ env.COMPOSE_FILE }} build
-
-      - name: Save images
-        run: |
-          # Save images to tar files
-          docker save mongo > mongo.tar
-          docker save openneuropet/ezbids-api:latest > api.tar
-          docker save openneuropet/ezbids-handler:latest > handler.tar
-          docker save openneuropet/ezbids-ui:latest > ui.tar
-
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-            ui.tar
-          key: docker-local-images-${{ github.sha }}
-          restore-keys: |
-            docker-local-images-

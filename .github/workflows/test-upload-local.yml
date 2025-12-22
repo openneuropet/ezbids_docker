@@ -43,19 +43,6 @@ jobs:
         run: |
           make get-test-data
 
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        id: docker-cache
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-            ui.tar
-          key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            docker-local-images-
-
       - name: Setup environment
         run: |
           # copy the example.env to .env
@@ -66,18 +53,7 @@ jobs:
 
       - name: Build or load images
         run: |
-          if [ -f mongo.tar ] && [ -f api.tar ] && [ -f handler.tar ] && [ -f ui.tar ]; then
-            echo "Loading cached images..."
-            if ! docker load < mongo.tar || ! docker load < api.tar || ! docker load < handler.tar || ! docker load < ui.tar; then
-              echo "Failed to load cached images, building instead..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build
-            else
-              rm mongo.tar api.tar handler.tar ui.tar
-            fi
-          else
-            echo "Building images..."
-            docker compose -f ${{ env.COMPOSE_FILE }} build
-          fi
+          docker compose -f ${{ env.COMPOSE_FILE }} build
           
 
       - name: Start services
