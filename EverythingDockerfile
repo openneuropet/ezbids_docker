@@ -92,7 +92,7 @@ ENV DEBIAN_FRONTEND noninteractive
 # Install system dependencies
 RUN apt update && \
     apt-get update && apt-get upgrade -y && \
-    apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc \
+    apt-get install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc detox \
     build-essential pkg-config cmake git pigz rename zstd libopenjp2-7 libgdcm-tools wget libopenblas-dev \
     ca-certificates gnupg supervisor && \
     apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
