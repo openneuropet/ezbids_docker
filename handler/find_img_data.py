@@ -2,9 +2,17 @@
 
 import os
 import sys
+import argparse
 from pathlib import Path
 from pydicom import dcmread
 from presort_dicoms import presort
+
+parser = argparse.ArgumentParser(
+    prog='FindImageData',
+    description='Locates data suitable for converting to BIDS'
+)
+parser.add_argument('root')
+
 
 # presort can slow down ezBIDS as it examines every dicom, it's enabled/disabled
 # by setting the PRESORT environment variable to "true" or ""
@@ -39,7 +47,7 @@ def find_img_data(dir):
     # Define common DICOM file extensions (lowercase)
     dicom_extensions = ('.dcm', '.ima', '.img', '')
 
-    with open('find_img_data.log', 'w') as log:
+    with open('find_img_data.log', 'a+') as log:
         # MRI (raw only)
         for root, dirs, files in os.walk(dir):
             for f in sorted(files):

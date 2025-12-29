@@ -75,7 +75,8 @@ def create_thumbnail(img_file, image):
     else:
         object_img_array = image.dataobj[:]
 
-    output_file = img_file.split(".nii.gz")[0] + ".png"
+    ext = ".nii.gz" if img_file.endswith(".nii.gz") else ".nii"
+    output_file = img_file.split(ext)[0] + ".png"
 
     slice_x = object_img_array[floor(object_img_array.shape[0] / 2), :, :]
     slice_y = object_img_array[:, floor(object_img_array.shape[1] / 2), :]
@@ -118,7 +119,8 @@ def create_DWIshell_thumbnails(img_file, image, bval_file):
         path of corresponding NIfTI file's bval.
     """
 
-    output_file = img_file.split(".nii.gz")[0] + ".png"
+    ext = ".nii.gz" if img_file.endswith(".nii.gz") else ".nii"
+    output_file = img_file.split(ext)[0] + ".png"
     bvals = [floor(float(x)) for x in pd.read_csv(bval_file, delim_whitespace=True).columns.tolist()]
     modified_bvals = [round(x, -2) for x in bvals]
     unique_bvals = np.unique(modified_bvals).tolist()
@@ -163,7 +165,8 @@ if img_file.endswith(tuple(MEG_extensions)):
     create_MEG_thumbnail(img_file)
 else:
     if not img_file.endswith('blood.json'):
-        output_dir = img_file.split(".nii.gz")[0]
+        ext = ".nii.gz" if img_file.endswith(".nii.gz") else ".nii"
+        output_dir = img_file.split(ext)[0]
         image = nib.load(img_file)
 
         if len([x for x in image.shape if x < 0]):  # image has negative dimension(s), cannot process
@@ -181,7 +184,7 @@ else:
             else:
                 # object_img_array = image.dataobj[:]
 
-                bval_file = img_file.split(".nii.gz")[0].split("./")[-1] + ".bval"
+                bval_file = img_file.split(ext)[0].split("./")[-1] + ".bval"
                 if not os.path.isfile(f"{data_dir}/{bval_file}"):
                     bval_file = "n/a"
                 else:

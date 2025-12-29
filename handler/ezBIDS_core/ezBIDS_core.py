@@ -647,7 +647,7 @@ def generate_dataset_description(DATA_DIR, bids_compliant):
         dataset_description = json.load(dataset_description, strict=False)
 
         for field in dataset_description:
-            if field in dataset_description_dic.keys() and "GeneratedBy" not in field:
+            if "GeneratedBy" not in field:
                 dataset_description_dic[field] = dataset_description[field]
 
     else:
@@ -671,13 +671,13 @@ def generate_dataset_description(DATA_DIR, bids_compliant):
     ]
 
     # Explicit checks for required information
-    if dataset_description_dic["Name"] == "":
+    if dataset_description_dic.get("Name", "") == "":
         dataset_description_dic["Name"] = "Untitled"
 
-    if dataset_description_dic["BIDSVersion"] == "":
+    if dataset_description_dic.get("BIDSVersion", "") == "":
         dataset_description_dic["BIDSVersion"] = "1.9.0"
 
-    if dataset_description_dic["DatasetType"] == "":
+    if dataset_description_dic.get("DatasetType", "") == "":
         dataset_description_dic["DatasetType"] = "raw"
 
     return dataset_description_dic
@@ -918,6 +918,7 @@ def generate_dataset_list(uploaded_files_list, exclude_data):
     img_list = natsorted(
         [
             x for x in uploaded_files_list if x.endswith('nii.gz')
+            or x.endswith('nii')
             or x.endswith('blood.json')
             or x.endswith(tuple(MEG_extensions))
         ]
@@ -1107,7 +1108,7 @@ def generate_dataset_list(uploaded_files_list, exclude_data):
             echo_time = 0
 
         # Get the nibabel nifti image info
-        if img_file.endswith('.nii.gz'):
+        if img_file.endswith('.nii.gz') or img_file.endswith('.nii'):
             image = nib.load(img_file)
             ndim = image.ndim
 
@@ -2968,6 +2969,11 @@ def modify_objects_info(dataset_list):
                 elif item.endswith(".nii.gz"):
                     items.append({"path": item,
                                   "name": "nii.gz",
+                                  "pngPaths": [],
+                                  "headers": protocol["headers"]})
+                elif item.endswith(".nii"):
+                    items.append({"path": item,
+                                  "name": "nii",
                                   "pngPaths": [],
                                   "headers": protocol["headers"]})
                 elif item.endswith(tuple(MEG_extensions)):

@@ -1,4 +1,4 @@
-.PHONY: gettestdata clean-testdata setup-test test-upload clean-test
+.PHONY: gettestdata clean-testdata setup-test test-upload clean-test format-md
 
 # Create test_data directory if it doesn't exist
 test/test_data:
@@ -49,3 +49,8 @@ docker-build-everything:
 docker-push-everything:
 	docker push openneuropet/ezbids-everything:latest
 	docker push openneuropet/ezbids-everything:$(shell git describe --tags --always)
+
+# Format all markdown files with prettier (80 char line wrap)
+format-md:
+	@command -v npx >/dev/null 2>&1 || { echo "npx not found. Install Node.js first."; exit 1; }
+	npx prettier --prose-wrap always --print-width 80 --write "**/*.md"

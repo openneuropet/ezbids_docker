@@ -41,7 +41,7 @@
                     </a>
                 </el-tooltip>
                 <el-tooltip content="Open github">
-                    <a href="https://github.com/brainlife/ezbids" target="github">
+                    <a href="https://github.com/openneuropet/ezbids_docker" target="github">
                         <font-awesome-icon class="menu-footer-icon" :icon="['fab', 'github']" />
                     </a>
                 </el-tooltip>

@@ -44,29 +44,6 @@ jobs:
         run: |
           make get-test-data
 
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        id: docker-cache
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-          key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            docker-local-images-
-
-      - name: Cache Nginx images
-        uses: actions/cache@v4
-        id: nginx-cache
-        with:
-          path: |
-            ui-nginx.tar
-            nginx.tar
-          key: docker-nginx-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            docker-nginx-images-
-
       - name: Setup environment
         run: |
           # copy the example.env to .env
