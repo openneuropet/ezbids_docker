@@ -257,7 +257,7 @@ else
         echo ""
         echo "Error: Could not find any MRI, PET, or MEG imaging files in upload."
         echo "Please click the Debug (Download) section below and select the ${err_file} file."
-        echo "Please reach out to the ezBIDS team for further assistance: https://github.com/brainlife/ezbids/issues"
+        echo "Please reach out for further assistance: anthony.galassi@nih.gov or https://github.com/openneuropet/ezbids_docker/issues"
         exit 1
     fi
 

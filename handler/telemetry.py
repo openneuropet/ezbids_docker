@@ -25,12 +25,12 @@ def gather_telemetry(dtype):
         json_path = f'{DATA_DIR}/ezBIDS_core.json'
         output_file = "ezBIDS_core_telemetry.json"
         error_message = 'There is no ezBIDS_core.json file, indicating failure during the ezBIDS Core processing. \
-            Please contact support for assistance'
+            Please contact anthony.galassi@nih.gov or https://github.com/openneuropet/ezbids_docker/issues'
     else:
         json_path = f'{DATA_DIR}/finalized.json'
         output_file = "ezBIDS_finalized_telemetry.json"
         error_message = 'There is no ezBIDS finalized file, indicating either failure during ezBIDS or inability to \
-            finalize dataset. Please contact support for assistance'
+            finalize dataset. Please contact anthony.galassi@nih.gov or https://github.com/openneuropet/ezbids_docker/issues'
 
     if os.path.isfile(json_path):
         json_data = open(json_path)

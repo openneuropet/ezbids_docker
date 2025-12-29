@@ -73,8 +73,8 @@
                 <small>Please do not close or refresh this page until all files are uploaded.</small>
                 <div v-if="failedFiles.length > 0">
                     <el-alert type="error"
-                        >Permanently failed to upload some files, please email pestilli@utexas.edu for
-                        assistance</el-alert
+                        >Permanently failed to upload some files, please email anthony.galassi@nih.gov for
+                        assistance or create an issue at https://github.com/openneuropet/ezbids_docker</el-alert
                     >
                     <pre v-for="(entry, idx) in failedFiles" :key="idx" type="info" style="font-size: 80%">{{ entry.path }}</pre>
                 </div>
@@ -140,8 +140,8 @@
 
             <div v-if="session.status == 'failed'">
                 <el-alert type="error"
-                    >ezBIDS failed.. Please check the Debug logs and contact the ezBIDS team
-                    (pestilli@utexas.edu).</el-alert
+                    >ezBIDS failed.. Please check the Debug logs and contact anthony.galassi@nih.gov
+                    or create an issue at https://github.com/openneuropet/ezbids_docker</el-alert
                 >
                 <br />
                 <pre class="status">{{ session.status_msg }}</pre>
@@ -181,8 +181,8 @@
                 </div>
                 <div v-if="!ezbids.notLoaded && !ezbids.objects.length">
                     <el-alert type="error"
-                        >We couldn't find any objects. Please upload data that contains at least 1 object. Contact the
-                        ezBIDS team (pestilli@utexas.edu or https://github.com/brainlife/ezbids/issues) for
+                        >We couldn't find any objects. Please upload data that contains at least 1 object. Contact
+                        anthony.galassi@nih.gov or https://github.com/openneuropet/ezbids_docker/issues for
                         support</el-alert
                     >
                 </div>
