@@ -56,6 +56,15 @@ jobs:
       - name: Start Services
         run: |
           docker run -d -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp openneuropet/ezbids-everything
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to start..."
+          sleep 30
+          docker ps
+          echo "Checking API health..."
+          curl -f http://localhost:8082/health || echo "API not ready yet"
+      
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -63,6 +72,10 @@ jobs:
 
       - name: Verify uv installation
         run: uv --version
+
+      - name: Debug with tmate
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
 
       - name: Run upload test
         run: |
