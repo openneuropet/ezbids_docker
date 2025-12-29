@@ -647,7 +647,7 @@ def generate_dataset_description(DATA_DIR, bids_compliant):
         dataset_description = json.load(dataset_description, strict=False)
 
         for field in dataset_description:
-            if field in dataset_description_dic.keys() and "GeneratedBy" not in field:
+            if "GeneratedBy" not in field:
                 dataset_description_dic[field] = dataset_description[field]
 
     else:
@@ -671,13 +671,13 @@ def generate_dataset_description(DATA_DIR, bids_compliant):
     ]
 
     # Explicit checks for required information
-    if dataset_description_dic["Name"] == "":
+    if dataset_description_dic.get("Name", "") == "":
         dataset_description_dic["Name"] = "Untitled"
 
-    if dataset_description_dic["BIDSVersion"] == "":
+    if dataset_description_dic.get("BIDSVersion", "") == "":
         dataset_description_dic["BIDSVersion"] = "1.9.0"
 
-    if dataset_description_dic["DatasetType"] == "":
+    if dataset_description_dic.get("DatasetType", "") == "":
         dataset_description_dic["DatasetType"] = "raw"
 
     return dataset_description_dic

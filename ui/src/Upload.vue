@@ -311,8 +311,11 @@ export default defineComponent({
                 this.uploadedCount = 0;
                 this.uploadedSize = 0;
                 this.batches = [];
+                this.totalFiles = 0;
                 await this.collectHandles(dirHandle, dirHandle.name);
+                // Set totalFiles after collection completes to ensure accurate count
                 this.totalFiles = this.pendingFiles.size;
+                console.log(`Collected ${this.totalFiles} files for upload`);
                 this.startUpload();
             } catch (err) {
                 if (err.name !== 'AbortError') console.error(err);
