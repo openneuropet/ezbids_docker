@@ -151,6 +151,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
         o.items.forEach(item => {
             let derivatives = null;
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii", derivatives);
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix + ".nii.gz", derivatives);
                     break;
@@ -170,6 +173,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
         o.items.forEach(item => {
             let derivatives = null;
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii", derivatives);
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix + ".nii.gz", derivatives);
                     break;
@@ -246,6 +252,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             if (suffix == "UNIT1")
                 derivatives = manufacturer;
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii", derivatives);
+                    break;
                 case "nii.gz":
                     if (o.defaced && o.defaceSelection == "defaced") {
                         item.path = item.path + ".defaced.nii.gz";
@@ -317,6 +326,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             //normal func stuff..
             o.items.forEach(item => {
                 switch (item.name) {
+                    case "nii":
+                        handleItem(item, suffix + ".nii");
+                        break;
                     case "nii.gz":
                         handleItem(item, suffix + ".nii.gz");
                         break;
@@ -358,6 +370,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
         */
         o.items.forEach(item => {
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii");
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix + ".nii.gz");
                     break;
@@ -422,6 +437,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
     function handleDwi() {
         o.items.forEach(item => {
             switch (item.name) {
+                case "nii":
+                    handleItem(item, "dwi.nii");
+                    break;
                 case "nii.gz":
                     handleItem(item, "dwi.nii.gz");
                     break;
