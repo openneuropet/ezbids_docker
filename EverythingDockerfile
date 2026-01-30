@@ -13,10 +13,10 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt update && \
     apt-get update && apt-get upgrade -y
 
-RUN apt update && apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc detox
+RUN apt update && apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc detox vim
 
 RUN pip3 install numpy==1.23.0 nibabel==4.0.0 pandas matplotlib pyyaml==5.4.1 pydicom==2.3.1 natsort pydeface && \
-    pip3 install quickshear mne mne-bids pypet2bids==1.4.1
+    pip3 install quickshear mne mne-bids pypet2bids
 
 RUN apt-get install -y build-essential pkg-config cmake git pigz rename zstd libopenjp2-7 libgdcm-tools wget libopenblas-dev && \
     apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
@@ -183,55 +183,88 @@ COPY <<EOF /etc/supervisor/conf.d/ezbids.conf
 [supervisord]
 nodaemon=true
 user=root
+logfile=/var/log/supervisord.log
+pidfile=/var/run/supervisord.pid
 
 [program:mongodb]
-command=mongod --bind_ip_all --port 27017
+command=mongod --bind_ip_all --port 27017 --dbpath /data/db
 autostart=true
 autorestart=true
+startsecs=5
+startretries=3
+priority=100
 stderr_logfile=/var/log/mongodb.err.log
 stdout_logfile=/var/log/mongodb.out.log
+stderr_logfile_maxbytes=50MB
+stdout_logfile_maxbytes=50MB
 
 [program:api]
-command=/app/api/dev.sh
+command=/bin/bash /app/api/dev.sh
 directory=/app/api
 autostart=true
 autorestart=true
+startsecs=10
+startretries=3
+priority=200
 environment=MONGO_CONNECTION_STRING="mongodb://localhost:27017/ezbids",BRAINLIFE_AUTHENTICATION="false"
 stderr_logfile=/var/log/api.err.log
 stdout_logfile=/var/log/api.out.log
-depends_on=mongodb
+stderr_logfile_maxbytes=50MB
+stdout_logfile_maxbytes=50MB
 
 [program:handler]
 command=pm2 start handler.js --attach --watch --ignore-watch "ui **/node_modules **__pycache__**"
 directory=/app/handler
 autostart=true
 autorestart=true
+startsecs=15
+startretries=3
+priority=300
 environment=MONGO_CONNECTION_STRING="mongodb://localhost:27017/ezbids",PRESORT="false"
 stderr_logfile=/var/log/handler.err.log
 stdout_logfile=/var/log/handler.out.log
-depends_on=api
+stderr_logfile_maxbytes=50MB
+stdout_logfile_maxbytes=50MB
 
 [program:ui]
-command=/entrypoint-ui.sh
+command=/bin/bash entrypoint.sh
 directory=/app/ui
 autostart=true
 autorestart=true
+startsecs=15
+startretries=5
+priority=300
 environment=VITE_APIHOST="http://localhost:8082",VITE_BRAINLIFE_AUTHENTICATION="false"
 stderr_logfile=/var/log/ui.err.log
 stdout_logfile=/var/log/ui.out.log
-depends_on=api
+stderr_logfile_maxbytes=50MB
+stdout_logfile_maxbytes=50MB
 
 [program:telemetry]
 command=start-telemetry
 autostart=false
 autorestart=true
+startsecs=5
+startretries=3
+priority=200
 stderr_logfile=/var/log/telemetry.err.log
 stdout_logfile=/var/log/telemetry.out.log
-depends_on=mongodb
+stderr_logfile_maxbytes=50MB
+stdout_logfile_maxbytes=50MB
 EOF
 
-# Create necessary directories
-RUN mkdir -p /data/db /var/log /tmp/ezbids-workdir
+# Create necessary directories with proper permissions
+RUN mkdir -p /data/db /var/log /tmp/ezbids-workdir /var/run /etc/supervisor && \
+    chmod 755 /data/db /var/log /tmp/ezbids-workdir /var/run /etc/supervisor && \
+    chown -R root:root /data/db /var/log /tmp/ezbids-workdir /etc/supervisor
+
+# Ensure UI entrypoint is executable and uses bash explicitly
+RUN chmod +x /entrypoint-ui.sh && \
+    chmod +x /app/api/dev.sh
+
+# Copy debug script for troubleshooting
+COPY debug-ui.sh /debug-ui.sh
+RUN chmod +x /debug-ui.sh
 
 # Expose ports
 EXPOSE 27017 8082 3000 8000
