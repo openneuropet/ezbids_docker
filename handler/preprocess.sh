@@ -102,7 +102,13 @@ if [ $bids_compliant == "true" ]; then
     (cd $root && find . -maxdepth 9 -type f \( -name "*.nii" \) >> $root/list)
     (cd $root && find . -maxdepth 9 -type f \( -name "*blood.json" \) >> $root/list)
 
+    # Keep only list entries where the file exists (drops stale/nested duplicate paths)
+    while IFS= read -r line; do
+        [ -f "$root/${line#./}" ] && echo "$line"
+    done < "$root/list" > "$root/list.tmp" && mv "$root/list.tmp" "$root/list"
+
     echo "running ezBIDS_core (may take several minutes, depending on size of data)"
+    cp $root/list $root/list.before_ezbids_core
     python3 "./ezBIDS_core/ezBIDS_core.py" $root
 else
 
@@ -245,6 +251,11 @@ else
         cat $root/meg.list >> $root/list
     fi
 
+    # Keep only list entries where the file exists (drops stale/nested duplicate paths)
+    while IFS= read -r line; do
+        [ -f "$root/${line#./}" ] && echo "$line"
+    done < "$root/list" > "$root/list.tmp" && mv "$root/list.tmp" "$root/list"
+
     if [ ! -s $root/list ]; then
         err_file=''
         if [ `grep 'Error' $root/dcm2niix_error | wc -l` -ne 0 ]; then
@@ -266,6 +277,7 @@ else
     #(cd $root && find . -type f -name "*.nii" -exec rm {} \;)
 
     echo "running ezBIDS_core (may take several minutes, depending on size of data)"
+    cp $root/list $root/list.before_ezbids_core
     python3 "./ezBIDS_core/ezBIDS_core.py" $root
 
     echo "generating thumbnails for image sequences"
