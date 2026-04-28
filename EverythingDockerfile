@@ -45,6 +45,9 @@ RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesourc
 RUN apt-get update \
     && apt-get install nodejs -y
 
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV PATH="$HOME/.deno/bin:$PATH"
+
 RUN cd /tmp && curl -fLO https://github.com/rordenlab/dcm2niix/releases/latest/download/dcm2niix_lnx.zip \
     && unzip /tmp/dcm2niix_lnx.zip \
     && mv dcm2niix /usr/local/bin
@@ -71,6 +74,8 @@ RUN git clone https://github.com/bids-standard/bids-validator
 # Stage 3: Node.js base for API and UI
 FROM node:20 AS nodejs-stage
 RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV PATH="$HOME/.deno/bin:$PATH"
 
 # Stage 4: Telemetry dependencies
 FROM neurodebian:nd20.04-non-free AS telemetry-stage
@@ -105,6 +110,9 @@ ARG NODE_MAJOR=20
 RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
 
 RUN apt-get update && apt-get install nodejs -y
+
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV PATH="$HOME/.deno/bin:$PATH"
 
 # Install Python packages
 RUN pip3 install numpy==1.23.0 nibabel==4.0.0 pandas matplotlib pyyaml==5.4.1 pydicom==2.3.1 natsort pydeface && \
