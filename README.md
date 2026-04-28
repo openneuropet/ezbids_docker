@@ -111,16 +111,32 @@ docker compose build
 docker build -f EverythingDockerfile -t ezbids-everything .
 ```
 
-Then the run the following apptainer commands:
+[!NOTE]
+This combined docker image can be run with the following command: 
+`docker run -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp ezbids-everything`
+
+Next build the apptainer image: 
 
 ```bash
 apptainer build ezbids-everything.sif docker-daemon://ezbids-everything:latest
-apptainer run --fakeroot --writable-tmpfs --cleanenv --no-home ezbids-everything.sif
+```
+
+Then run the following apptainer command:
+
+```bash
+apptainer instance run --fakeroot --writable-tmpfs --cleanenv --no-home ezbids-everything.sif ezbids-apptainer
+```
+
+To stop:
+
+```bash
+apptainer instance stop ezbids-apptainer
 ```
 
 It should be noted that apptainer occasionally changes which ports it maps the
-ezBIDS ui to, but that will be mentioned in the console following the apptainer
-run step above.
+ezBIDS UI to, but that will be mentioned in the console following the instance
+run step above. Additionally, using `apptainer run` can lead to orphaned
+processes when the container exits. Use `apptainer instance run` for this image.
 
 **Back to Docker**
 

@@ -273,16 +273,9 @@ EXPOSE 27017 8082 3000 8000
 HEALTHCHECK --interval=10s --timeout=10s --retries=5 --start-period=30s \
     CMD curl -f http://localhost:8082/health || exit 1
 
-COPY <<EOF /everything-entrypoint.sh
-trap '/usr/bin/supervisord stop all' SIGINT SIGTERM 
-/usr/bin/supervisord -c /etc/supervisor/conf.d/ezbids.conf
-
-
-
-RUN chmod +x /everything-entrypoint.sh
-
-# Start all services with supervisor
-#CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/ezbids.conf"]
-CMD ["bash", "/everything-entrypoint.sh"]
+ # Start all services with supervisor
+ # Use explicit OCI entrypoint so runtimes launch supervisord directly.
+ ENTRYPOINT ["/usr/bin/supervisord"]
+ CMD ["-c", "/etc/supervisor/conf.d/ezbids.conf"]
 
 # run with docker run -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp ezbids-everything

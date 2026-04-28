@@ -55,7 +55,7 @@ else
     test_root=$root
 fi
 
-if [ -f $test_root/.bidsignore]; then
+if [ -f "$test_root/.bidsignore" ]; then
     touch $test_root/.bidsignore
     echo "*finalized.json" > $test_root/.bidsignore
 else
@@ -279,6 +279,11 @@ else
     echo "running ezBIDS_core (may take several minutes, depending on size of data)"
     cp $root/list $root/list.before_ezbids_core
     python3 "./ezBIDS_core/ezBIDS_core.py" $root
+
+    # ezBIDS_core can rename/move files; refresh list to include only current files.
+    while IFS= read -r line; do
+        [ -f "$root/${line#./}" ] && echo "$line"
+    done < "$root/list" | sort -u > "$root/list.tmp" && mv "$root/list.tmp" "$root/list"
 
     echo "generating thumbnails for image sequences"
     cat $root/list | parallel --linebuffer -j 6 --progress python3 "./ezBIDS_core/createThumbnailsMovies.py" $root
