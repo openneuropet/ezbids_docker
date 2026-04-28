@@ -210,4 +210,4 @@ else:
 
             # Remove the folder containing the PNGs for movie generation; don't need them anymore
             if os.path.isdir(output_dir):
-                shutil.rmtree(output_dir)
+                shutil.rmtree(output_dir, ignore_errors=True)
