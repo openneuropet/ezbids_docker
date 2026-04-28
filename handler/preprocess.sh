@@ -75,7 +75,7 @@ echo "*.png" >> $test_root/.bidsignore
 
 bids-validator $test_root > $test_root/validator.log || true
 
-if grep -w "ERROR" $test_root/validator.log; then
+if grep -Eq "\\[ERR\\]|\\[ERROR\\]|\\bERR\\b|\\bERROR\\b" "$test_root/validator.log"; then
 	echo "Uploaded data is not a BIDS-compliant dataset"
     bids_compliant="false"
 else

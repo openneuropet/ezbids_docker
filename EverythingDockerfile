@@ -66,11 +66,6 @@ ENV PATH /ROBEX:$PATH
 ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
 ENV PATH $NVM_DIR/v$NODE_VERSION/bin:$PATH
 
-#install bids-validator
-RUN npm install -g npm@9.5.1
-RUN npm install -g bids-validator@1.14.8
-RUN git clone https://github.com/bids-standard/bids-validator
-
 # Stage 3: Node.js base for API and UI
 FROM node:20 AS nodejs-stage
 RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch
