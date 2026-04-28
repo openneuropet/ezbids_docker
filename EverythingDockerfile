@@ -262,10 +262,6 @@ RUN mkdir -p /data/db /var/log /tmp/ezbids-workdir /var/run /etc/supervisor && \
 RUN chmod +x /entrypoint-ui.sh && \
     chmod +x /app/api/dev.sh
 
-# Copy debug script for troubleshooting
-COPY debug-ui.sh /debug-ui.sh
-RUN chmod +x /debug-ui.sh
-
 # Expose ports
 EXPOSE 27017 8082 3000 8000
 
