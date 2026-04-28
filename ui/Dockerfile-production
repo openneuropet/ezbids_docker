@@ -3,4 +3,6 @@ FROM node:20
 COPY . /ui
 WORKDIR /ui
 
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV PATH="$HOME/.deno/bin:$PATH"
 RUN npm install && npm run build
