@@ -7,14 +7,19 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt update && \
     apt-get update && apt-get upgrade -y
 
-RUN apt update && apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc
+RUN apt update && apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc detox
 
 RUN pip3 install numpy==1.23.0 nibabel==4.0.0 pandas matplotlib pyyaml==5.4.1 pydicom==2.3.1 natsort pydeface && \
-    pip3 install quickshear mne mne-bids
+    pip3 install quickshear mne mne-bids pypet2bids
 
 # Install pypet2bids
-RUN git clone https://github.com/openneuropet/PET2BIDS && \
-    cd PET2BIDS && make installpoetry buildpackage installpackage
+#RUN git clone https://github.com/openneuropet/PET2BIDS && \
+#    cd PET2BIDS && make installpoetry buildpackage installpackage
+
+RUN curl -fsSL https://deno.land/install.sh | sh \
+    && ln -sf "$HOME/.deno/bin/deno" /usr/local/bin/deno \
+    && deno --version
+ENV PATH="$HOME/.deno/bin:$PATH"
 
 RUN apt-get install -y build-essential pkg-config cmake git pigz rename zstd libopenjp2-7 libgdcm-tools wget libopenblas-dev && \
     apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
@@ -61,11 +66,17 @@ ENV PATH /ROBEX:$PATH
 
 ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
 ENV PATH $NVM_DIR/v$NODE_VERSION/bin:$PATH
+ENV PATH="$HOME/.deno/bin:$PATH"
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=300000 \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false
 
 #install bids-validator
 RUN npm install -g npm@9.5.1
-RUN npm install -g bids-validator@1.14.8
-RUN git clone https://github.com/bids-standard/bids-validator
+RUN deno compile -ERWN -o /usr/local/bin/bids-validator jsr:@bids/validator && /usr/local/bin/bids-validator --version
 
 # move copy to last step to save time on container rebuilding
 COPY . /app

@@ -316,7 +316,7 @@
                                 />
                             </el-select>
                             <el-button
-                                v-if="item.path?.endsWith('.nii.gz')"
+                                v-if="item.path?.endsWith('.nii.gz') || item.path?.endsWith('.nii')"
                                 size="small"
                                 type="info"
                                 @click="$emit('niivue', item.path)"

@@ -3,6 +3,7 @@
 const fs = require('fs');
 const mkdirp = require('mkdirp');
 const async = require('async');
+const pathlib = require('node:path');
 const bidsEntitiesOrdered = require('../ui/src/assets/schema/rules/entities.json')
 
 //import { IObject, Subject, Session, OrganizedSession } from '../ui/src/store'
@@ -25,10 +26,10 @@ info.entityMappings = newEntityOrdering
 
 const datasetName = info.datasetDescription.Name;
 
-mkdirp.sync(root+"/bids/"+datasetName);
-fs.writeFileSync(root+"/bids/"+datasetName+"/finalized.json", JSON.stringify(info, null, 4)); //copy the finalized.json
-fs.writeFileSync(root+"/bids/"+datasetName+"/dataset_description.json", JSON.stringify(info.datasetDescription, null, 4));
-fs.writeFileSync(root+"/bids/"+datasetName+"/.bidsignore", `
+mkdirp.sync(pathlib.join(root, "bids", datasetName));
+fs.writeFileSync(pathlib.join(root, "bids", datasetName, "finalized.json"), JSON.stringify(info, null, 4)); //copy the finalized.json
+fs.writeFileSync(pathlib.join(root, "bids", datasetName, "dataset_description.json"), JSON.stringify(info.datasetDescription, null, 4));
+fs.writeFileSync(pathlib.join(root, "bids", datasetName, ".bidsignore"), `
 **/excluded
 **/*_MP2RAGE.*
 *finalized.json
@@ -41,8 +42,8 @@ info.readme += `
 This dataset was converted from DICOM to BIDS using ezBIDS (https://brainlife.io/ezbids)
 
 `;
-fs.writeFileSync(root+"/bids/"+datasetName+"/README", info.readme);
-fs.writeFileSync(root+"/bids/"+datasetName+"/participants.json", JSON.stringify(info.participantsColumn, null, 4));
+fs.writeFileSync(pathlib.join(root, "bids", datasetName, "README"), info.readme);
+fs.writeFileSync(pathlib.join(root, "bids", datasetName, "participants.json"), JSON.stringify(info.participantsColumn, null, 4));
 
 //convert participants.json to tsv
 console.log("outputting participants.json/tsv");
@@ -67,7 +68,7 @@ for(const subject_idx in info.participantInfo) {
     tsv.push(tsvrec);
 }
 
-let tsvf = fs.openSync(root+"/bids/"+datasetName+"/participants.tsv", "w");
+let tsvf = fs.openSync(pathlib.join(root, "bids", datasetName, "participants.tsv"), "w");
 for(let rec of tsv) {
     fs.writeSync(tsvf, rec.join("\t")+"\n");
 }
@@ -115,10 +116,10 @@ async.forEachOf(info.objects, (o, idx, next_o)=>{
 
     function handleItem(item, filename, derivatives = null) {
         const path = composePath(derivatives);
-        mkdirp.sync(root+"/"+path);
-
+        mkdirp.sync(pathlib.join(root, path));
         //setup directory
-        let fullpath = root+"/"+path+"/"+name+"_"+filename;
+        let fullpath = pathlib.join(root, path, name+"_"+filename);
+	console.log("fullpath", fullpath);
 
         if(item.name == "json") {
             //we create sidecar from sidecar object (edited by the user)
@@ -128,6 +129,7 @@ async.forEachOf(info.objects, (o, idx, next_o)=>{
         if(item.content) {
             //if item has content to write, then use it instead of normal file
             fs.writeFileSync(fullpath, item.content);
+	    console.log("item.content", item.content);
         } else{
             //otherwise, assume to be normal files (link from the source)
             try {
@@ -140,13 +142,16 @@ async.forEachOf(info.objects, (o, idx, next_o)=>{
             //I need to use hardlink so that when archiver tries to create .zip in download API
             //the files will be found. As far as I know, archiver module can't de-reference
             //symlinks
-            fs.linkSync(root+"/"+item.path, fullpath);
+            fs.linkSync(pathlib.join(root, item.path), fullpath);
         }
     }
     function handlePET() {
         o.items.forEach(item => {
             let derivatives = null;
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii", derivatives);
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix + ".nii.gz", derivatives);
                     break;
@@ -238,6 +243,13 @@ async.forEachOf(info.objects, (o, idx, next_o)=>{
             if(suffix == "UNIT1") derivatives = manufacturer;
 
             switch(item.name) {
+            case "nii":
+                if(o.defaced && o.defaceSelection == "defaced") {
+                    item.path = item.path+".defaced.nii";
+                    console.log("using defaced version of t1w", item.path);
+                }
+                handleItem(item, suffix + ".nii", derivatives);
+                break;
             case "nii.gz":
                 if(o.defaced && o.defaceSelection == "defaced") {
                     item.path = item.path+".defaced.nii.gz";
@@ -312,6 +324,9 @@ async.forEachOf(info.objects, (o, idx, next_o)=>{
             //normal func stuff..
             o.items.forEach(item=>{
                 switch(item.name) {
+                case "nii":
+                    handleItem(item, suffix+".nii");
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix+".nii.gz");
                     break;
@@ -354,6 +369,9 @@ async.forEachOf(info.objects, (o, idx, next_o)=>{
         */
         o.items.forEach(item=>{
             switch(item.name) {
+            case "nii":
+                handleItem(item, suffix+".nii");
+                break;
             case "nii.gz":
                 handleItem(item, suffix+".nii.gz");
                 break;
@@ -419,6 +437,9 @@ async.forEachOf(info.objects, (o, idx, next_o)=>{
     function handleDwi() {
         o.items.forEach(item=>{
             switch(item.name) {
+            case "nii":
+                handleItem(item, "dwi.nii");
+                break;
             case "nii.gz":
                 handleItem(item, "dwi.nii.gz");
                 break;

@@ -1,8 +1,6 @@
-name: Test Local Upload
+name: Test Docker Build Everything Image
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
   workflow_run:
@@ -12,7 +10,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  Test-Local-Uploads:
+  Test-Docker-Build-Everything-Image:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
@@ -51,21 +49,22 @@ jobs:
           # Update .env to use the hostname
           sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost/" .env
 
-      - name: Build or load images
+      - name: Build Single Docker Image
         run: |
-          docker compose -f ${{ env.COMPOSE_FILE }} build
-          
-
-      - name: Start services
+          docker build -f EverythingDockerfile -t openneuropet/ezbids-everything .
+      
+      - name: Start Services
         run: |
-          # Create and set permissions for temp directory
-          mkdir -p /tmp/ezbids-workdir
-          chmod 770 /tmp/ezbids-workdir
-          
-          # Start services using our tagged images
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d
+          docker run -d -p 27017:27017 -p 8082:8082 -p 3000:3000 -p 8000:8000 -v /tmp/ezbids-workdir:/tmp openneuropet/ezbids-everything
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to start..."
           sleep 30
-
+          docker ps
+          echo "Checking API health..."
+          curl -f http://localhost:8082/health || echo "API not ready yet"
+      
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -74,12 +73,12 @@ jobs:
       - name: Verify uv installation
         run: uv --version
 
+      - name: Debug with tmate
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        timeout-minutes: 30
+
       - name: Run upload test
         run: |
           make test-upload
-
-      - name: Push Images
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
-        run: |
-          docker login ${{ secrets.DOCKER_USERNAME }} ${{ secrets.DOCKER_PASSWORD }}
-          make docker-local-push
+ 

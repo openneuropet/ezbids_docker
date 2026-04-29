@@ -1,6 +1,8 @@
 name: Test Nginx Upload
 
 on:
+  push:
+    branches: [ master ]
   pull_request:
     branches: [ master ]
   workflow_run:
@@ -42,29 +44,6 @@ jobs:
         run: |
           make get-test-data
 
-      - name: Cache Docker images
-        uses: actions/cache@v4
-        id: docker-cache
-        with:
-          path: |
-            mongo.tar
-            api.tar
-            handler.tar
-          key: docker-local-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            docker-local-images-
-
-      - name: Cache Nginx images
-        uses: actions/cache@v4
-        id: nginx-cache
-        with:
-          path: |
-            ui-nginx.tar
-            nginx.tar
-          key: docker-nginx-images-${{ github.event.workflow_run.head_sha || github.sha }}
-          restore-keys: |
-            docker-nginx-images-
-
       - name: Setup environment
         run: |
           # copy the example.env to .env
@@ -89,9 +68,6 @@ jobs:
             docker compose -f ${{ env.COMPOSE_FILE }} build
           fi
           
-          # Tag the images to match docker-compose
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-api:latest api:latest
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-handler:latest handler:latest
 
       - name: Build or load nginx images
         run: |
@@ -108,9 +84,6 @@ jobs:
             docker compose -f ${{ env.COMPOSE_FILE }} build
           fi
           
-          # Tag the UI image to match docker-compose
-          docker tag ${REGISTRY_PREFIX}/${REPO_NAME}-ui:latest ui:latest
-
       - name: Do additional Nginx setup
         run: |
           # create self signed certs using the hostname
@@ -137,3 +110,9 @@ jobs:
       - name: Run upload test
         run: |
           make test-upload
+
+      - name: Push Images
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+        run: |
+          docker login ${{ secrets.DOCKER_USERNAME }} ${{ secrets.DOCKER_PASSWORD }}
+          make docker-nginx-push

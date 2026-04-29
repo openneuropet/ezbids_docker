@@ -3,6 +3,7 @@
 const fs = require('fs');
 const mkdirp = require('mkdirp');
 const async = require('async');
+const pathlib = require('node:path');
 const bidsEntitiesOrdered = require('../ui/src/assets/schema/rules/entities.json');
 //import { IObject, Subject, Session, OrganizedSession } from '../ui/src/store'
 const root = process.argv[2];
@@ -108,6 +109,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
         mkdirp.sync(root + "/" + path);
         //setup directory
         let fullpath = root + "/" + path + "/" + name + "_" + filename;
+	console.log("root:", root);
+	console.log("path:", path);
+	console.log("fullpath:", fullpath);
         if (item.name == "json") {
             //we create sidecar from sidecar object (edited by the user)
             
@@ -144,13 +148,17 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             //I need to use hardlink so that when archiver tries to create .zip in download API
             //the files will be found. As far as I know, archiver module can't de-reference
             //symlinks
-            fs.linkSync(root + "/" + item.path, fullpath);
+	    console.log("root + / + item.path", root + "/" + item.path)
+	    fs.linkSync(root + "/" + item.path, fullpath);
         }
     }
     function handlePET() {
         o.items.forEach(item => {
             let derivatives = null;
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii", derivatives);
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix + ".nii.gz", derivatives);
                     break;
@@ -170,6 +178,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
         o.items.forEach(item => {
             let derivatives = null;
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii", derivatives);
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix + ".nii.gz", derivatives);
                     break;
@@ -246,6 +257,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             if (suffix == "UNIT1")
                 derivatives = manufacturer;
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii", derivatives);
+                    break;
                 case "nii.gz":
                     if (o.defaced && o.defaceSelection == "defaced") {
                         item.path = item.path + ".defaced.nii.gz";
@@ -317,6 +331,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
             //normal func stuff..
             o.items.forEach(item => {
                 switch (item.name) {
+                    case "nii":
+                        handleItem(item, suffix + ".nii");
+                        break;
                     case "nii.gz":
                         handleItem(item, suffix + ".nii.gz");
                         break;
@@ -358,6 +375,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
         */
         o.items.forEach(item => {
             switch (item.name) {
+                case "nii":
+                    handleItem(item, suffix + ".nii");
+                    break;
                 case "nii.gz":
                     handleItem(item, suffix + ".nii.gz");
                     break;
@@ -422,6 +442,9 @@ async.forEachOf(info.objects, (o, idx, next_o) => {
     function handleDwi() {
         o.items.forEach(item => {
             switch (item.name) {
+                case "nii":
+                    handleItem(item, "dwi.nii");
+                    break;
                 case "nii.gz":
                     handleItem(item, "dwi.nii.gz");
                     break;

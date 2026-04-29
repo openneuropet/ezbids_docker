@@ -23,7 +23,8 @@ echo "running expand.sh"
 ./expand.sh $root
 
 echo "replace file paths that contain space, quotation, or [@^()] characters"
-find "$root" -depth -name "*[ @^()]*" -print0 | sort -rz | xargs -0 -n 1 -I {} ./rename_special_chars.sh {}
+#find "$root" -depth -name "*[ @^()]*" -print0 | sort -rz | xargs -0 -n 1 -I {} ./rename_special_chars.sh {}
+detox -r "$root"
 
 # check to see if uploaded data is a BIDS-compliant dataset
 echo "Running bids-validator to check BIDS compliance"
@@ -54,7 +55,7 @@ else
     test_root=$root
 fi
 
-if [ -f $test_root/.bidsignore]; then
+if [ -f "$test_root/.bidsignore" ]; then
     touch $test_root/.bidsignore
     echo "*finalized.json" > $test_root/.bidsignore
 else
@@ -74,7 +75,7 @@ echo "*.png" >> $test_root/.bidsignore
 
 bids-validator $test_root > $test_root/validator.log || true
 
-if grep -w "ERR" $test_root/validator.log; then
+if grep -Eq "\\[ERR\\]|\\[ERROR\\]|\\bERR\\b|\\bERROR\\b" "$test_root/validator.log"; then
 	echo "Uploaded data is not a BIDS-compliant dataset"
     bids_compliant="false"
 else
@@ -98,16 +99,23 @@ if [ $bids_compliant == "true" ]; then
     
     # find products (NIfTI files)
     (cd $root && find . -maxdepth 9 -type f \( -name "*.nii.gz" \) > $root/list)
+    (cd $root && find . -maxdepth 9 -type f \( -name "*.nii" \) >> $root/list)
     (cd $root && find . -maxdepth 9 -type f \( -name "*blood.json" \) >> $root/list)
 
+    # Keep only list entries where the file exists (drops stale/nested duplicate paths)
+    while IFS= read -r line; do
+        [ -f "$root/${line#./}" ] && echo "$line"
+    done < "$root/list" > "$root/list.tmp" && mv "$root/list.tmp" "$root/list"
+
     echo "running ezBIDS_core (may take several minutes, depending on size of data)"
+    cp $root/list $root/list.before_ezbids_core
     python3 "./ezBIDS_core/ezBIDS_core.py" $root
 else
 
     # If there are .nii files, compress them to .nii.gz
     echo "Making sure all NIfTI files are in .nii.gz format"
     touch $root/nii_files
-    find $root -name "*.nii" > $root/nii_files
+    find $root -maxdepth 9 -type f \( -name "*.nii" \) > $root/nii_files
     [ -s $root/nii_files ] && gzip --force $(cat $root/nii_files)
 
     echo "processing $root"
@@ -236,12 +244,17 @@ else
     fi
 
     # Add all transformed data (e.g. NIfTI or MEG formats) to the list file
-    (cd $root && find . -maxdepth 9 -type f \( -name "*.nii.gz" \) > $root/list)
+    (cd $root && find . -maxdepth 9 -type f \( -name "*.nii*" \) > $root/list)
     (cd $root && find . -maxdepth 9 -type f \( -name "*blood.json" \) >> $root/list)
 
     if [ -f $root/meg.list ]; then
         cat $root/meg.list >> $root/list
     fi
+
+    # Keep only list entries where the file exists (drops stale/nested duplicate paths)
+    while IFS= read -r line; do
+        [ -f "$root/${line#./}" ] && echo "$line"
+    done < "$root/list" > "$root/list.tmp" && mv "$root/list.tmp" "$root/list"
 
     if [ ! -s $root/list ]; then
         err_file=''
@@ -256,15 +269,21 @@ else
         echo ""
         echo "Error: Could not find any MRI, PET, or MEG imaging files in upload."
         echo "Please click the Debug (Download) section below and select the ${err_file} file."
-        echo "Please reach out to the ezBIDS team for further assistance: https://github.com/brainlife/ezbids/issues"
+        echo "Please reach out for further assistance: anthony.galassi@nih.gov or https://github.com/openneuropet/ezbids_docker/issues"
         exit 1
     fi
 
     # Remove .nii files that are randomly created somehow. Don't need them, as actual files are in .nii.gz format
-    (cd $root && find . -type f -name "*.nii" -exec rm {} \;)
+    #(cd $root && find . -type f -name "*.nii" -exec rm {} \;)
 
     echo "running ezBIDS_core (may take several minutes, depending on size of data)"
+    cp $root/list $root/list.before_ezbids_core
     python3 "./ezBIDS_core/ezBIDS_core.py" $root
+
+    # ezBIDS_core can rename/move files; refresh list to include only current files.
+    while IFS= read -r line; do
+        [ -f "$root/${line#./}" ] && echo "$line"
+    done < "$root/list" | sort -u > "$root/list.tmp" && mv "$root/list.tmp" "$root/list"
 
     echo "generating thumbnails for image sequences"
     cat $root/list | parallel --linebuffer -j 6 --progress python3 "./ezBIDS_core/createThumbnailsMovies.py" $root

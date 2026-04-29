@@ -1,4 +1,4 @@
-name: Test Local Upload
+name: Test Apptainer Build Local
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  Test-Local-Uploads:
+  Test-Apptainer-Local-Uploads-and-Build:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
@@ -50,21 +50,32 @@ jobs:
 
           # Update .env to use the hostname
           sed -i "s/SERVER_NAME=.*/SERVER_NAME=localhost/" .env
-
-      - name: Build or load images
-        run: |
-          docker compose -f ${{ env.COMPOSE_FILE }} build
           
 
-      - name: Start services
+      - name: Clean Up some More Space
+        run: bash .github/scripts/util_free_space.sh
+
+      - name: Setup Apptainer
         run: |
-          # Create and set permissions for temp directory
-          mkdir -p /tmp/ezbids-workdir
-          chmod 770 /tmp/ezbids-workdir
+          sudo apt update
+          sudo apt install -y software-properties-common
+          sudo add-apt-repository -y ppa:apptainer/ppa
+          sudo apt update
+          sudo apt install -y apptainer
           
-          # Start services using our tagged images
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d
-          sleep 30
+          apptainer --version
+      
+      - name: Build Single Docker Image
+        run: |
+          docker build -f EverythingDockerfile -t ezbids-everything .
+
+      - name: Build Apptainer Image
+        run: |
+          apptainer build ezbids-everything.sif docker-daemon://ezbids-everything:latest
+
+      - name: Run Apptainer Image
+        run: |
+          apptainer instance start --fakeroot --writable-tmpfs --cleanenv --no-home ezbids-everything.sif ezbids-everything
 
       - name: Install uv
         run: |
@@ -74,12 +85,29 @@ jobs:
       - name: Verify uv installation
         run: uv --version
 
+      - name: Verify Apptainer image is running
+        run: |
+          apptainer instance list | grep ezbids-everything
+          if [ $? -ne 0 ]; then
+            echo "Apptainer image is not running"
+            exit 1
+          fi
+
       - name: Run upload test
         run: |
           make test-upload
 
+      - name: Verify Apptainer image is running after upload 
+        run: |
+          apptainer instance list | grep ezbids-everything
+          if [ $? -ne 0 ]; then
+            echo "Apptainer image is not running"
+            exit 1
+          fi
+      
       - name: Push Images
         if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
         run: |
           docker login ${{ secrets.DOCKER_USERNAME }} ${{ secrets.DOCKER_PASSWORD }}
-          make docker-local-push
+          make docker-push-everything
+

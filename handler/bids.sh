@@ -27,8 +27,8 @@ echo "output bids directory structure"
 tree "$rootDir" > $root/tree.log
 
 echo "running bids validator"
-bids-validator "$rootDir" > $root/validator.log || true
-bids-validator --json "$rootDir" > $root/validator.json || true
+bids-validator --ignoreWarnings "$rootDir" > $root/validator.log || true
+bids-validator --ignoreWarnings --json "$rootDir" > $root/validator.json || true
 
 echo "Copying finalized.json file to ezBIDS_template.json"
 cp -r $root/finalized.json $root/ezBIDS_template.json

@@ -11,12 +11,12 @@
         <h2>Feedbacks / Comments</h2>
         <p>
             ezBIDS is a brand new web service! Your feedback is extremely valuable to us. Please send us an email at
-            <a href="mailto:pestilli@utexas.edu" target="mail">pestilli@utexas.edu</a> describing your experience with
+            <a href="mailto:anthony.galassi@nih.gov" target="mail">anthony.galassi@nih.gov</a> describing your experience with
             any feedbacks / comments / suggestions.
         </p>
         <p>
             If you have experienced any issues while using ezBIDS, please submit an
-            <a href="https://github.com/brainlife/ezbids/issues" target="github">Github Issues</a>
+            <a href="https://github.com/openneuropet/ezbids_docker/issues" target="github">Github Issue</a>
         </p>
         <br />
 
