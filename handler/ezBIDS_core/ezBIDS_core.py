@@ -1697,7 +1697,8 @@ def template_configuration(dataset_list_unique_series, subs_information, config_
     subjects_sessions_info = config_data["subjects"]
     config_dataset_list_unique_series = config_data["series"]
     config_dataset_list_objects = config_data["objects"]
-    bids_uri = config_data["BIDSURI"]
+    # Older template files may not include this field.
+    bids_uri = config_data.get("BIDSURI", False)
 
     # Try to determine subject (and session) mapping from what's in the configuration
     match_start_index = None

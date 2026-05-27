@@ -13,10 +13,15 @@
 
 # Parse command line arguments
 DAEMON_MODE=false
+NO_BUILD_MODE=false
 while [[ $# -gt 0 ]]; do
   case $1 in
     -d|--daemon)
       DAEMON_MODE=true
+      shift
+      ;;
+    --no-build)
+      NO_BUILD_MODE=true
       shift
       ;;
     *)
@@ -52,6 +57,10 @@ do
   fi
 done < .env
 
+if [[ ${EZBIDS_NO_BUILD:-false} == true ]]; then
+  NO_BUILD_MODE=true
+fi
+
 if [ $BRAINLIFE_DEVELOPMENT == true ]; then
   # enable or disable debugging output
   set -ex
@@ -68,8 +77,18 @@ git submodule update --init --recursive
 # from outside of the computer it's hosted on, you don't need nginx.
 if [[ $BRAINLIFE_USE_NGINX == true ]]; then
   DOCKER_COMPOSE_FILE=docker-compose-nginx.yml
+elif [[ $BRAINLIFE_DEVELOPMENT == true ]]; then
+  DOCKER_COMPOSE_FILE=docker-compose-dev.yaml
 else
   DOCKER_COMPOSE_FILE=docker-compose.yml
+fi
+
+# Local dev bind-mounts ./api, so keys must exist on the host (not only in the image)
+if [[ $BRAINLIFE_DEVELOPMENT == true ]] && [[ $BRAINLIFE_USE_NGINX != true ]]; then
+  if [ ! -f api/ezbids.key ] || [ ! -f api/ezbids.pub ]; then
+    echo "API keys not found; running ./generate_keys.sh for local development"
+    ./generate_keys.sh
+  fi
 fi
 
 # Create the working directory if it doesn't exist
@@ -108,16 +127,38 @@ fi
 # ok docker compose is now included in docker as an option for docker
 if [[ $(command -v docker-compose) ]]; then 
     # if the older version is installed use the dash
+    if [ "$NO_BUILD_MODE" = true ]; then
+        docker-compose --file ${DOCKER_COMPOSE_FILE} pull
+    fi
     if [ "$DAEMON_MODE" = true ]; then
-        docker-compose --file ${DOCKER_COMPOSE_FILE} up -d
+        if [ "$NO_BUILD_MODE" = true ]; then
+            docker-compose --file ${DOCKER_COMPOSE_FILE} up --no-build -d
+        else
+            docker-compose --file ${DOCKER_COMPOSE_FILE} up -d
+        fi
     else
-        docker-compose --file ${DOCKER_COMPOSE_FILE} up
+        if [ "$NO_BUILD_MODE" = true ]; then
+            docker-compose --file ${DOCKER_COMPOSE_FILE} up --no-build
+        else
+            docker-compose --file ${DOCKER_COMPOSE_FILE} up
+        fi
     fi
 else
     # if the newer version is installed don't use the dash
+    if [ "$NO_BUILD_MODE" = true ]; then
+        docker compose --file ${DOCKER_COMPOSE_FILE} pull
+    fi
     if [ "$DAEMON_MODE" = true ]; then
-        docker compose --file ${DOCKER_COMPOSE_FILE} up -d
+        if [ "$NO_BUILD_MODE" = true ]; then
+            docker compose --file ${DOCKER_COMPOSE_FILE} up --no-build -d
+        else
+            docker compose --file ${DOCKER_COMPOSE_FILE} up -d
+        fi
     else
-        docker compose --file ${DOCKER_COMPOSE_FILE} up
+        if [ "$NO_BUILD_MODE" = true ]; then
+            docker compose --file ${DOCKER_COMPOSE_FILE} up --no-build
+        else
+            docker compose --file ${DOCKER_COMPOSE_FILE} up
+        fi
     fi
 fi

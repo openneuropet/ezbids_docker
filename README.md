@@ -98,6 +98,50 @@ docker compose up
 docker compose up -d
 ```
 
+#### Local Development (Bind Mounts, No Nginx)
+
+For active development, use the dev compose file that bind-mounts local code
+into the running containers.
+
+1. Set these values in `.env`:
+
+```bash
+BRAINLIFE_USE_NGINX=false
+BRAINLIFE_DEVELOPMENT=true
+```
+
+2. Start with either:
+
+```bash
+./launch.sh
+```
+
+or directly:
+
+```bash
+docker compose -f docker-compose-dev.yaml up
+```
+
+This mode exposes:
+
+- UI: `http://localhost:3000`
+- API: `http://localhost:8082`
+- MongoDB: `localhost:27417`
+
+Notes:
+
+- `docker-compose-dev.yaml` includes bind mounts for `ui`, `handler`, and `api`.
+- `node_modules` are intentionally kept inside containers (`/app/api/node_modules`
+  and `/ui/node_modules`), so you can bind-mount source code without installing
+  dependencies on the host.
+- Services are pinned to `linux/amd64` in compose; on Apple Silicon, Docker
+  Desktop runs these with emulation. This is expected for this stack.
+- If you want to skip local builds, set `EZBIDS_NO_BUILD=true` (or run
+  `./launch.sh --no-build`) to pull/run prebuilt images instead.
+- If file watching appears slow or misses changes on desktop Docker, try
+  restarting the affected service and, if needed, switching that watcher to a
+  polling mode.
+
 **Apptainer Use**
 
 The apptainer image must be built from the `EverythingDockerfile`, which is in

@@ -31,6 +31,10 @@ services:
         platform: linux/amd64
         volumes:
             - ${EZBIDS_TMP_DIR:-/tmp/ezbids-workdir/}:/tmp
+            # Mount local api source for live development
+            - ./api:/app/api
+            # Keep container-installed dependencies when source is bind-mounted
+            - /app/api/node_modules
         depends_on:
             mongodb:
                 condition: service_healthy
@@ -122,6 +126,8 @@ services:
             - ./ui/public:/ui/public
             - ./ui/index.html:/ui/index.html
             - ./ui/vite.config.ts:/ui/vite.config.ts
+            # Keep container-installed dependencies
+            - /ui/node_modules
 
     # by default this is not enabled, need to run docker compose with --profile development to enable this service
     telemetry:
