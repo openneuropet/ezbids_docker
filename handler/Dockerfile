@@ -3,6 +3,8 @@ FROM neurodebian:nd20.04-non-free
 SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND noninteractive
+ARG NODE_MAJOR=20
+ARG BIDS_VERSION=v1.11.1
 
 RUN apt update && \
     apt-get update && apt-get upgrade -y
@@ -10,7 +12,7 @@ RUN apt update && \
 RUN apt update && apt install -y parallel python3 python3-pip tree curl unzip git jq python libgl-dev python-numpy bc detox
 
 RUN pip3 install numpy==1.23.0 nibabel==4.0.0 pandas matplotlib pyyaml==5.4.1 pydicom==2.3.1 natsort pydeface && \
-    pip3 install quickshear mne mne-bids pypet2bids
+    pip3 install quickshear mne mne-bids pypet2bids bidsschematools
 
 # Install pypet2bids
 #RUN git clone https://github.com/openneuropet/PET2BIDS && \
@@ -43,7 +45,6 @@ RUN apt-get update \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 
-ARG NODE_MAJOR=20
 RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
 
 RUN apt-get update \
@@ -57,7 +58,7 @@ RUN mkdir -p /app
 
 # Get bids-specification from github
 RUN cd /app && git clone https://github.com/bids-standard/bids-specification && \
-    cd bids-specification && git checkout 3537e9edbc81545614d3ee605c398361099b6977
+    cd bids-specification && git checkout tags/$BIDS_VERSION
 
 #install ROBEX
 ADD https://www.nitrc.org/frs/download.php/5994/ROBEXv12.linux64.tar.gz//?i_agree=1&download_now=1 /

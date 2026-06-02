@@ -25,19 +25,22 @@ from datetime import date
 from natsort import natsorted
 from operator import itemgetter
 from urllib.request import urlopen
+from bidsschematools.schema import load_schema
 
 DATA_DIR = sys.argv[1]
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 BIDS_SCHEMA_DIR = PROJECT_DIR / Path("bids-specification/src/schema")
 
-datatypes_yaml = yaml.load(open(BIDS_SCHEMA_DIR / Path("objects/datatypes.yaml")), Loader=yaml.FullLoader)
-entities_yaml = yaml.load(open(BIDS_SCHEMA_DIR / Path("objects/entities.yaml")), Loader=yaml.FullLoader)
-suffixes_yaml = yaml.load(open(BIDS_SCHEMA_DIR / Path("objects/suffixes.yaml")), Loader=yaml.FullLoader)
-dataset_description_yaml = yaml.load(open(BIDS_SCHEMA_DIR / Path("rules/dataset_metadata.yaml")),
-                                     Loader=yaml.FullLoader)
-datatype_suffix_rules = str(BIDS_SCHEMA_DIR / Path("rules/datatypes"))
-entity_ordering_file = str(BIDS_SCHEMA_DIR / Path("rules/entities.yaml"))
+bids_schema = load_schema()
+
+
+datatypes_yaml = bids_schema.objects.datatypes
+entities_yaml = bids_schema.objects.entities
+suffixes_yaml = bids_schema.objects.suffixes
+dataset_description_yaml = bids_schema.rules.dataset_metadata
+datatype_suffix_rules = bids_schema.rules.files.raw
+entity_ordering_file = bids_schema.rules.entities
 
 cog_atlas_url = "http://cognitiveatlas.org/api/v-alpha/task"
 
@@ -1863,10 +1866,10 @@ def create_lookup_info():
     for datatype in datatypes_yaml.keys():
         if datatype in accepted_datatypes:
             lookup_dic[datatype] = {}
-            rule = yaml.load(open(os.path.join(analyzer_dir, datatype_suffix_rules, datatype) + ".yaml"),
-                             Loader=yaml.FullLoader)
+            rule = bids_schema.rules.files.raw[datatype]
 
             for key in rule.keys():
+                
                 suffixes = rule[key]["suffixes"]
                 if datatype == "anat":
                     # Remove deprecated suffixes
@@ -2301,8 +2304,7 @@ def datatype_suffix_identification(dataset_list_unique_series, lookup_dic, confi
                 if f"/{datatype}/" in json_path:
                     unique_dic["datatype"] = datatype
 
-                rule = yaml.load(open(os.path.join(analyzer_dir, datatype_suffix_rules, datatype) + ".yaml"),
-                                 Loader=yaml.FullLoader)
+                rule = bids_schema.rules.files.raw[datatype]
 
                 suffixes = [x for y in [rule[x]["suffixes"] for x in rule] for x in y]
 
@@ -2629,7 +2631,7 @@ def entity_labels_identification(dataset_list_unique_series, lookup_dic):
     print("")
     print("Entity label identification")
     print("----------------------------")
-    entity_ordering = yaml.load(open(os.path.join(analyzer_dir, entity_ordering_file)), Loader=yaml.FullLoader)
+    entity_ordering = bids_schema.rules.entities
 
     tb1afi_tr = 1
     tb1srge_td = 1
@@ -2645,7 +2647,7 @@ def entity_labels_identification(dataset_list_unique_series, lookup_dic):
             # Check to see if entity labels can be determined from BIDS naming convention
             for key in entities_yaml:
                 if key not in ["subject", "session", "direction"]:  # ezBIDS already knows PED for dir entity label
-                    entity = entities_yaml[key]['entity']
+                    entity = entities_yaml[key]['name']
                     if f"_{entity}_" in sd:
                         # series_entities[key] = re.split(regex, sd.split(f"{entity}_")[-1])[0].replace("_", "")
                         # series_entities[key] = re.split('_', sd.split(f"{entity}_")[-1])[0] Used as of 12/13/23
@@ -2892,7 +2894,7 @@ def modify_objects_info(dataset_list):
     """
     objects_list = []
 
-    entity_ordering = yaml.load(open(os.path.join(analyzer_dir, entity_ordering_file)), Loader=yaml.FullLoader)
+    entity_ordering = bids_schema.rules.entities
 
     # Find unique subject/session idx pairs in dataset and sort them
     subj_ses_pairs = [[x["subject_idx"], x["session_idx"]] for x in dataset_list]

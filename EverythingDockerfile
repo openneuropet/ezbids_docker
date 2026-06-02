@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 FROM neurodebian:nd20.04-non-free AS neuroimaging-stage
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND noninteractive
-
+ARG NODE_MAJOR=20
+ARG BIDS_VERSION=v1.11.1
 RUN apt update && \
     apt-get update && apt-get upgrade -y
 
@@ -56,7 +57,7 @@ RUN mkdir -p /app
 
 # Get bids-specification from github
 RUN cd /app && git clone https://github.com/bids-standard/bids-specification && \
-    cd bids-specification && git checkout 3537e9edbc81545614d3ee605c398361099b6977
+    cd bids-specification && git checkout tags/$BIDS_VERSION
 
 #install ROBEX
 ADD https://www.nitrc.org/frs/download.php/5994/ROBEXv12.linux64.tar.gz//?i_agree=1&download_now=1 /
