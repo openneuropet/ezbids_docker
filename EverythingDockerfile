@@ -107,7 +107,9 @@ RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesourc
 
 RUN apt-get update && apt-get install nodejs -y
 
-RUN curl -fsSL https://deno.land/install.sh | sh
+RUN curl -fsSL https://deno.land/install.sh | sh \
+    && ln -sf "$HOME/.deno/bin/deno" /usr/local/bin/deno \
+    && deno --version
 ENV PATH="$HOME/.deno/bin:$PATH"
 
 # Install Python packages
@@ -145,15 +147,18 @@ RUN tar -xzf /ROBEXv12.linux64.tar.gz
 ENV PATH /ROBEX:$PATH
 
 # Install Node.js global packages
-RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch bids-validator@1.14.8
+RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch
 
-# Get bids-specification from github
-RUN mkdir -p /app && \
-    cd /app && git clone https://github.com/bids-standard/bids-specification && \
-    cd bids-specification && git checkout 3537e9edbc81545614d3ee605c398361099b6977
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=300000 \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false
 
-# Clone bids-validator
-RUN git clone https://github.com/bids-standard/bids-validator /app/bids-validator
+# Install bids-validator (Deno-compiled; same as handler/Dockerfile)
+RUN deno compile -ERWN -o /usr/local/bin/bids-validator jsr:@bids/validator \
+    && /usr/local/bin/bids-validator --version
 
 # Copy application code
 COPY . /app
