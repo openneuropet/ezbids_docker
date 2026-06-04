@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 FROM neurodebian:nd20.04-non-free AS neuroimaging-stage
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND noninteractive
-
+ARG NODE_MAJOR=20
+ARG BIDS_VERSION=v1.11.1
 RUN apt update && \
     apt-get update && apt-get upgrade -y
 
@@ -56,7 +57,7 @@ RUN mkdir -p /app
 
 # Get bids-specification from github
 RUN cd /app && git clone https://github.com/bids-standard/bids-specification && \
-    cd bids-specification && git checkout 3537e9edbc81545614d3ee605c398361099b6977
+    cd bids-specification && git checkout tags/$BIDS_VERSION
 
 #install ROBEX
 ADD https://www.nitrc.org/frs/download.php/5994/ROBEXv12.linux64.tar.gz//?i_agree=1&download_now=1 /
@@ -106,12 +107,14 @@ RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesourc
 
 RUN apt-get update && apt-get install nodejs -y
 
-RUN curl -fsSL https://deno.land/install.sh | sh
+RUN curl -fsSL https://deno.land/install.sh | sh \
+    && ln -sf "$HOME/.deno/bin/deno" /usr/local/bin/deno \
+    && deno --version
 ENV PATH="$HOME/.deno/bin:$PATH"
 
 # Install Python packages
 RUN pip3 install numpy==1.23.0 nibabel==4.0.0 pandas matplotlib pyyaml==5.4.1 pydicom==2.3.1 natsort pydeface && \
-    pip3 install quickshear mne mne-bids pypet2bids==1.4.1 conversiontelemetry
+    pip3 install quickshear mne mne-bids pypet2bids bidsschematools conversiontelemetry
 
 # Install MongoDB
 RUN wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add - && \
@@ -144,15 +147,18 @@ RUN tar -xzf /ROBEXv12.linux64.tar.gz
 ENV PATH /ROBEX:$PATH
 
 # Install Node.js global packages
-RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch bids-validator@1.14.8
+RUN npm install -g npm@9.5.1 pm2 typescript tsc-watch
 
-# Get bids-specification from github
-RUN mkdir -p /app && \
-    cd /app && git clone https://github.com/bids-standard/bids-specification && \
-    cd bids-specification && git checkout 3537e9edbc81545614d3ee605c398361099b6977
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=300000 \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false
 
-# Clone bids-validator
-RUN git clone https://github.com/bids-standard/bids-validator /app/bids-validator
+# Install bids-validator (Deno-compiled; same as handler/Dockerfile)
+RUN deno compile -ERWN -o /usr/local/bin/bids-validator jsr:@bids/validator \
+    && /usr/local/bin/bids-validator --version
 
 # Copy application code
 COPY . /app
