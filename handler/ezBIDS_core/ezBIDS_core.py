@@ -1700,7 +1700,7 @@ def template_configuration(dataset_list_unique_series, subs_information, config_
     subjects_sessions_info = config_data["subjects"]
     config_dataset_list_unique_series = config_data["series"]
     config_dataset_list_objects = config_data["objects"]
-    bids_uri = config_data["BIDSURI"]
+    bids_uri = config_data.get("BIDSURI", False)
 
     # Try to determine subject (and session) mapping from what's in the configuration
     match_start_index = None
@@ -1749,12 +1749,16 @@ def template_configuration(dataset_list_unique_series, subs_information, config_
             # Maybe subject ID contains mix of letters and numbers
             letters = "".join([x for x in ref_subject_id if x.isalpha()])  # Assuming letters at start of sub ID string
             numeric_ID = "".join([x for x in ref_subject_id if x.isnumeric()])
-            nonzero_num = numeric_ID.lstrip("0")
-            num_leading_zeros = len(numeric_ID) - len(nonzero_num)
-            if numeric_ID.endswith("9"):
-                sub = letters + "0" * (num_leading_zeros - 1) + str(int(nonzero_num) + subject_counter)
+            if numeric_ID:
+                nonzero_num = numeric_ID.lstrip("0")
+                num_leading_zeros = len(numeric_ID) - len(nonzero_num)
+                if numeric_ID.endswith("9"):
+                    sub = letters + "0" * (num_leading_zeros - 1) + str(int(nonzero_num) + subject_counter)
+                else:
+                    sub = letters + "0" * num_leading_zeros + str(int(nonzero_num) + subject_counter)
             else:
-                sub = letters + "0" * num_leading_zeros + str(int(nonzero_num) + subject_counter)
+                # Alphabetic-only subject ID (e.g. from Brainlife); append counter for new subjects
+                sub = f"{ref_subject_id}{subject_counter}"
             sub_info["subject"] = sub
             subject_counter += 1
 
