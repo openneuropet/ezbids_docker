@@ -7,12 +7,25 @@
             </p>
 
             <div v-if="!starting">
-                <div class="select-area">
+                <div
+                    class="select-area"
+                    :class="{ 'select-area--dragging': isDragging }"
+                    @dragenter.prevent="onDragEnter"
+                    @dragover.prevent
+                    @dragleave.prevent="onDragLeave"
+                    @drop.prevent="onDrop"
+                >
                     <div class="select-area-backdrop">
                         <b><span style="letter-spacing: -4vh">ez</span>BIDS</b>
                     </div>
                     <div>
-                        <b>Select a folder containing DICOM (or dcm2niix) data</b>
+                        <b>
+                            {{
+                                isDragging
+                                    ? 'Drop the data here'
+                                    : 'Select or drop a folder containing DICOM (or dcm2niix) data'
+                            }}
+                        </b>
                         <br />
                         <br />
                         <el-button type="primary" size="large" @click="selectDirectory">
@@ -20,7 +33,9 @@
                         </el-button>
                         <br />
                         <br />
-                        <small style="opacity: 0.7">Requires Chrome or Edge browser</small>
+                        <small style="opacity: 0.7">
+                            Drag and drop or directory selection requires Chrome or Edge
+                        </small>
                     </div>
                 </div>
 
@@ -240,6 +255,8 @@ export default defineComponent({
     data() {
         return {
             starting: false,
+            isDragging: false,
+            dragDepth: 0,
 
             // File System Access API - stores { handle, path, retries }
             pendingFiles: new Set(),
@@ -302,22 +319,99 @@ export default defineComponent({
             return null;
         },
 
+        onDragEnter(event) {
+            if (!event.dataTransfer.types.includes('Files')) return;
+
+            this.dragDepth++;
+            this.isDragging = true;
+        },
+
+        onDragLeave() {
+            this.dragDepth = Math.max(0, this.dragDepth - 1);
+
+            if (this.dragDepth === 0) {
+                this.isDragging = false;
+            }
+        },
+
+        resetUploadState() {
+            this.pendingFiles = new Set();
+            this.failedFiles = [];
+            this.uploadedCount = 0;
+            this.uploadedSize = 0;
+            this.batches = [];
+            this.totalFiles = 0;
+        },
+
+        async onDrop(event) {
+            this.dragDepth = 0;
+            this.isDragging = false;
+
+            if (this.starting) return;
+
+            const items = Array.from(event.dataTransfer.items).filter((item) => item.kind === 'file');
+
+            if (items.length === 0 || typeof items[0].getAsFileSystemHandle !== 'function') {
+                ElNotification({
+                    message: 'Folder drag and drop requires Chrome or Edge.',
+                    type: 'warning',
+                });
+                return;
+            }
+
+            // These calls must happen before the first await. Chromium only grants
+            // access to the drag data during the synchronous drop-event callback.
+            const handlePromises = items.map((item) => item.getAsFileSystemHandle());
+
+            this.starting = true;
+            this.resetUploadState();
+
+            try {
+                const handles = (await Promise.all(handlePromises)).filter(Boolean);
+
+                for (const handle of handles) {
+                    if (handle.kind === 'file') {
+                        this.pendingFiles.add({ handle, path: handle.name, retries: 0 });
+                    } else if (handle.kind === 'directory') {
+                        await this.collectHandles(handle, handle.name);
+                    }
+                }
+
+                this.totalFiles = this.pendingFiles.size;
+
+                if (this.totalFiles === 0) {
+                    this.starting = false;
+                    ElNotification({
+                        message: 'No files were found in the dropped data.',
+                        type: 'warning',
+                    });
+                    return;
+                }
+
+                console.log(`Collected ${this.totalFiles} files for upload`);
+                await this.startUpload();
+            } catch (err) {
+                this.starting = false;
+                console.error(err);
+                ElNotification({
+                    message: 'The dropped files or folder could not be read.',
+                    type: 'error',
+                });
+            }
+        },
+
         async selectDirectory() {
             try {
                 const dirHandle = await window.showDirectoryPicker();
                 this.starting = true;
-                this.pendingFiles = new Set();
-                this.failedFiles = [];
-                this.uploadedCount = 0;
-                this.uploadedSize = 0;
-                this.batches = [];
-                this.totalFiles = 0;
+                this.resetUploadState();
                 await this.collectHandles(dirHandle, dirHandle.name);
                 // Set totalFiles after collection completes to ensure accurate count
                 this.totalFiles = this.pendingFiles.size;
                 console.log(`Collected ${this.totalFiles} files for upload`);
-                this.startUpload();
+                await this.startUpload();
             } catch (err) {
+                this.starting = false;
                 if (err.name !== 'AbortError') console.error(err);
             }
         },
@@ -510,6 +604,15 @@ export default defineComponent({
     position: relative;
     overflow: hidden;
     text-align: center;
+    transition:
+        background-color 150ms ease,
+        box-shadow 150ms ease,
+        transform 150ms ease;
+}
+.select-area--dragging {
+    background-color: rgba(64, 158, 255, 0.18);
+    box-shadow: inset 0 0 0 3px #409eff;
+    transform: scale(1.01);
 }
 .select-area-backdrop {
     position: absolute;
