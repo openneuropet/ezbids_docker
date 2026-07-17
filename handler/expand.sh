@@ -21,6 +21,10 @@ function expand {
 
     #use pigz for gz
     for tar in $(find $root -name "*.tar.gz"); do
+        if ispet --path-only --skim --njobs 1 "$(dirname "$tar")" >/dev/null; then
+            echo "leaving PET archive for pypet2bids: $tar" >&2
+            continue
+        fi
         if [ ! -d $(dirname $tar)/$expand_counter ]; then
             mkdir -p $(dirname $tar)/$expand_counter
         fi
@@ -30,6 +34,10 @@ function expand {
     done
 
     for tar in $(find $root -name "*.tgz"); do
+        if ispet --path-only --skim --njobs 1 "$(dirname "$tar")" >/dev/null; then
+            echo "leaving PET archive for pypet2bids: $tar" >&2
+            continue
+        fi
         #tar is too verbose
         if [ ! -d $(dirname $tar)/$expand_counter ]; then
             mkdir -p $(dirname $tar)/$expand_counter
@@ -41,6 +49,10 @@ function expand {
 
     #let tar handle all other compression algorithms in default way
     for tar in $(find $root -name "*.tar*"); do
+        if ispet --path-only --skim --njobs 1 "$(dirname "$tar")" >/dev/null; then
+            echo "leaving PET archive for pypet2bids: $tar" >&2
+            continue
+        fi
         echo "found $tar ----------"
         if [ ! -d $(dirname $tar)/$expand_counter ]; then
             mkdir -p $(dirname $tar)/$expand_counter
@@ -97,5 +109,3 @@ while true; do
         break
     fi
 done
-
-

@@ -129,7 +129,14 @@ else
         path=$1
 
         echo "----------------------- dcm2niix4pet: $path ------------------------"
-        timeout 3600 dcm2niix4pet --silent --ezbids $path
+        if [ -f "$path" ]; then
+            # Archive inputs are extracted to a temporary folder by
+            # pypet2bids. Keep their outputs beside the uploaded archive.
+            destination=$(dirname "$path")
+            timeout 3600 dcm2niix4pet --silent --ezbids "$path" --destination-path "$destination"
+        else
+            timeout 3600 dcm2niix4pet --silent --ezbids "$path"
+        fi
 
         #all good
         echo $path >> pet2bids.done

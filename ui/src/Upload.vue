@@ -351,7 +351,7 @@ export default defineComponent({
 
             const items = Array.from(event.dataTransfer.items).filter((item) => item.kind === 'file');
 
-            if (items.length === 0 || typeof items[0].getAsFileSystemHandle !== 'function') {
+            if (items.length === 0 || typeof items[0].webkitGetAsEntry !== 'function') {
                 ElNotification({
                     message: 'Folder drag and drop requires Chrome or Edge.',
                     type: 'warning',
@@ -359,21 +359,42 @@ export default defineComponent({
                 return;
             }
 
-            // These calls must happen before the first await. Chromium only grants
-            // access to the drag data during the synchronous drop-event callback.
-            const handlePromises = items.map((item) => item.getAsFileSystemHandle());
+            // Capture entries synchronously: Chromium only exposes the drag data
+            // during the drop-event callback. FileSystemEntry also preserves each
+            // item's full relative path, which PET metadata discovery relies on.
+            const entries = items.map((item) => item.webkitGetAsEntry()).filter(Boolean);
 
             this.starting = true;
             this.resetUploadState();
 
             try {
-                const handles = (await Promise.all(handlePromises)).filter(Boolean);
+                const readEntries = (directoryReader) =>
+                    new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
+                const getFile = (fileEntry) =>
+                    new Promise((resolve, reject) => fileEntry.file(resolve, reject));
+                const queue = [...entries];
 
-                for (const handle of handles) {
-                    if (handle.kind === 'file') {
-                        this.pendingFiles.add({ handle, path: handle.name, retries: 0 });
-                    } else if (handle.kind === 'directory') {
-                        await this.collectHandles(handle, handle.name);
+                while (queue.length > 0) {
+                    const entry = queue.shift();
+
+                    if (entry.isFile) {
+                        const file = await getFile(entry);
+                        const path = entry.fullPath.replace(/^\/+/, '') || file.name;
+
+                        // Keep processFiles() lazy-handle compatible without
+                        // changing its batching and retry behavior.
+                        const handle = { getFile: async () => file };
+                        this.pendingFiles.add({ handle, path, retries: 0 });
+                    } else if (entry.isDirectory) {
+                        const directoryReader = entry.createReader();
+                        let children = await readEntries(directoryReader);
+
+                        // Chromium returns directory entries in batches (often
+                        // at most 100), so continue until the reader is empty.
+                        while (children.length > 0) {
+                            queue.push(...children);
+                            children = await readEntries(directoryReader);
+                        }
                     }
                 }
 
