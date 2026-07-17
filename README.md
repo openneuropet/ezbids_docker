@@ -47,28 +47,20 @@ Helpful links:
 
 ### Browser Requirements
 
-ezBIDS uses the
+ezBIDS supports uploads from modern browsers, including Google Chrome,
+Microsoft Edge, Firefox, Safari, Brave, Opera, and other Chromium-based
+browsers.
+
+Chrome and Edge are recommended for large datasets. They use the
 [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API)
-to efficiently upload files directly from your local disk to the server. This
-API streams files directly rather than loading them entirely into browser memory
-first, enabling uploads of large datasets that would otherwise crash the
-browser.
+to traverse selected or dropped directories and read files lazily as upload
+batches are prepared. This reduces browser memory pressure and makes large
+uploads faster and more reliable.
 
-**Supported browsers:**
-
-- Google Chrome
-- Microsoft Edge
-- Brave
-- Opera
-- Other Chromium-based browsers
-
-**Not supported:**
-
-- Firefox
-- Safari
-
-If you encounter issues with file uploads, ensure you're using a Chromium-based
-browser.
+Browsers without the File System Access API use directory/file selection and
+drag-and-drop fallbacks. These browsers are supported, although large uploads
+may initialize and upload more slowly. If a browser cannot read a dropped
+directory, use the **Select Directory** button instead.
 
 ### Usage
 

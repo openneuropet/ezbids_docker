@@ -31,10 +31,19 @@
                         <el-button type="primary" size="large" @click="selectDirectory">
                             Select Directory
                         </el-button>
+                        <input
+                            ref="directoryInput"
+                            class="directory-input"
+                            type="file"
+                            directory
+                            webkitdirectory
+                            multiple
+                            @change="onDirectoryInput"
+                        />
                         <br />
                         <br />
                         <small style="opacity: 0.7">
-                            Drag and drop or directory selection requires Chrome or Edge
+                            All modern browsers are supported. Chrome or Edge is recommended for faster large uploads.
                         </small>
                     </div>
                 </div>
@@ -350,51 +359,69 @@ export default defineComponent({
             if (this.starting) return;
 
             const items = Array.from(event.dataTransfer.items).filter((item) => item.kind === 'file');
+            const droppedFiles = Array.from(event.dataTransfer.files || []);
 
-            if (items.length === 0 || typeof items[0].webkitGetAsEntry !== 'function') {
+            if (items.length === 0 && droppedFiles.length === 0) {
                 ElNotification({
-                    message: 'Folder drag and drop requires Chrome or Edge.',
+                    message: 'The dropped files or folder cannot be read by this browser.',
                     type: 'warning',
                 });
                 return;
             }
 
-            // Capture entries synchronously: Chromium only exposes the drag data
-            // during the drop-event callback. FileSystemEntry also preserves each
-            // item's full relative path, which PET metadata discovery relies on.
-            const entries = items.map((item) => item.webkitGetAsEntry()).filter(Boolean);
+            // Chromium only grants access to dropped data during this callback.
+            // Prefer FileSystemHandles for lazy direct access, but capture legacy
+            // entries too so a failed handle request still has a usable fallback.
+            const supportsHandles = items.every(
+                (item) => typeof item.getAsFileSystemHandle === 'function'
+            );
+            const handlePromises = supportsHandles
+                ? items.map((item) => item.getAsFileSystemHandle())
+                : null;
+            const entries = items
+                .map((item) =>
+                    typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null
+                )
+                .filter(Boolean);
+
+            if (!handlePromises && entries.length === 0 && droppedFiles.length === 0) {
+                ElNotification({
+                    message: 'The dropped files or folder cannot be read by this browser.',
+                    type: 'warning',
+                });
+                return;
+            }
 
             this.starting = true;
             this.resetUploadState();
 
             try {
-                const readEntries = (directoryReader) =>
-                    new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
-                const getFile = (fileEntry) =>
-                    new Promise((resolve, reject) => fileEntry.file(resolve, reject));
-                const queue = [...entries];
+                let collectedHandles = false;
 
-                while (queue.length > 0) {
-                    const entry = queue.shift();
+                if (handlePromises) {
+                    try {
+                        const handles = await Promise.all(handlePromises);
 
-                    if (entry.isFile) {
-                        const file = await getFile(entry);
-                        const path = entry.fullPath.replace(/^\/+/, '') || file.name;
-
-                        // Keep processFiles() lazy-handle compatible without
-                        // changing its batching and retry behavior.
-                        const handle = { getFile: async () => file };
-                        this.pendingFiles.add({ handle, path, retries: 0 });
-                    } else if (entry.isDirectory) {
-                        const directoryReader = entry.createReader();
-                        let children = await readEntries(directoryReader);
-
-                        // Chromium returns directory entries in batches (often
-                        // at most 100), so continue until the reader is empty.
-                        while (children.length > 0) {
-                            queue.push(...children);
-                            children = await readEntries(directoryReader);
+                        if (handles.every(Boolean)) {
+                            for (const handle of handles) {
+                                if (handle.kind === 'file') {
+                                    this.pendingFiles.add({ handle, path: handle.name, retries: 0 });
+                                } else if (handle.kind === 'directory') {
+                                    await this.collectHandles(handle, handle.name);
+                                }
+                            }
+                            collectedHandles = true;
                         }
+                    } catch (err) {
+                        console.warn('FileSystemHandle access failed; using entry fallback.', err);
+                    }
+                }
+
+                if (!collectedHandles) {
+                    if (entries.length > 0) {
+                        await this.collectDroppedEntries(entries);
+                    } else {
+                        this.collectFiles(droppedFiles);
                     }
                 }
 
@@ -422,6 +449,12 @@ export default defineComponent({
         },
 
         async selectDirectory() {
+            if (typeof window.showDirectoryPicker !== 'function') {
+                this.$refs.directoryInput.value = '';
+                this.$refs.directoryInput.click();
+                return;
+            }
+
             try {
                 const dirHandle = await window.showDirectoryPicker();
                 this.starting = true;
@@ -437,6 +470,27 @@ export default defineComponent({
             }
         },
 
+        async onDirectoryInput(event) {
+            const files = Array.from(event.target.files || []);
+
+            if (files.length === 0 || this.starting) return;
+
+            this.starting = true;
+            this.resetUploadState();
+            this.collectFiles(files);
+            this.totalFiles = this.pendingFiles.size;
+            console.log(`Collected ${this.totalFiles} files for upload`);
+            await this.startUpload();
+        },
+
+        collectFiles(files) {
+            for (const file of files) {
+                const path = file.webkitRelativePath || file.name;
+                const handle = { getFile: async () => file };
+                this.pendingFiles.add({ handle, path, retries: 0 });
+            }
+        },
+
         async collectHandles(dirHandle, basePath) {
             for await (const entry of dirHandle.values()) {
                 const path = `${basePath}/${entry.name}`;
@@ -444,6 +498,35 @@ export default defineComponent({
                     this.pendingFiles.add({ handle: entry, path, retries: 0 });
                 } else if (entry.kind === 'directory') {
                     await this.collectHandles(entry, path);
+                }
+            }
+        },
+
+        async collectDroppedEntries(entries) {
+            const readEntries = (directoryReader) =>
+                new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
+            const queue = [...entries];
+
+            while (queue.length > 0) {
+                const entry = queue.shift();
+
+                if (entry.isFile) {
+                    const path = entry.fullPath.replace(/^\/+/, '') || entry.name;
+                    const handle = {
+                        getFile: () =>
+                            new Promise((resolve, reject) => entry.file(resolve, reject)),
+                    };
+                    this.pendingFiles.add({ handle, path, retries: 0 });
+                } else if (entry.isDirectory) {
+                    const directoryReader = entry.createReader();
+                    let children = await readEntries(directoryReader);
+
+                    // FileSystemDirectoryReader returns entries in batches,
+                    // often at most 100, so continue until the reader is empty.
+                    while (children.length > 0) {
+                        queue.push(...children);
+                        children = await readEntries(directoryReader);
+                    }
                 }
             }
         },
@@ -634,6 +717,9 @@ export default defineComponent({
     background-color: rgba(64, 158, 255, 0.18);
     box-shadow: inset 0 0 0 3px #409eff;
     transform: scale(1.01);
+}
+.directory-input {
+    display: none;
 }
 .select-area-backdrop {
     position: absolute;
