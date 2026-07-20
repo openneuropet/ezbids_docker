@@ -14,37 +14,40 @@
             <el-button type="success" @click="finalize">Finalize</el-button>
         </div>
 
-        <div
-            v-else-if="session.status == 'finalized' || (session.finalize_begin_date && !session.finalize_finish_date)"
-        >
+        <div v-else-if="session.status == 'finalized' || (session.finalize_begin_date && !session.finalize_finish_date)">
             <h3>
                 Converting to BIDS
                 <font-awesome-icon icon="spinner" pulse />
             </h3>
             <p>
-                <small
-                    ><i>{{ session.status_msg }}</i></small
-                >
+                <small>
+                    <i>{{ session.status_msg }}</i>
+                </small>
             </p>
         </div>
 
         <div v-else-if="session.finalize_finish_date">
             <div class="download">
                 <br />
-                <el-button type="success" style="float: right" size="small" @click="session.status = 'analyzed'"
-                    >Rerun Finalize Step</el-button
-                >
+                <el-button type="success" style="float: right" size="small" @click="session.status = 'analyzed'">
+                    Rerun Finalize Step</el-button>
                 <h3 style="margin-top: 0">All Done!</h3>
                 <p>Please download the BIDS formatted data to your local computer</p>
+                <el-button style="width: 250px" type="primary" @click="download(`bids/${ezbids.datasetDescription.Name}`)">
+                    Download BIDS
+                </el-button>
                 <el-button
+                    v-if="supportsDirectoryPicker"
                     style="width: 250px"
-                    type="primary"
-                    @click="download(`bids/${ezbids.datasetDescription.Name}`)"
-                    >Download BIDS</el-button
+                    type="info"
+                    :loading="writingDataset"
+                    @click="writeToExistingDataset"
                 >
+                    Download for existing BIDS dataset
+                </el-button>
                 <el-button style="width: 250px" type="primary" @click="download(`finalized.json`)"
-                    >Download configuration/template</el-button
-                >
+                    >Download configuration/template
+                </el-button>
                 <p>Or send the dataset to other cloud resources.</p>
                 <p>
                     <el-dropdown v-if="hasAuth">
@@ -55,9 +58,7 @@
                         <template #dropdown>
                             <el-dropdown-menu>
                                 <el-dropdown-item @click="sendBrainlife()">Send to brainlife</el-dropdown-item>
-                                <el-dropdown-item @click="sendBrainlife('DWI')"
-                                    >Send to brainlife and run DWI Pipeline</el-dropdown-item
-                                >
+                                <el-dropdown-item @click="sendBrainlife('DWI')">Send to brainlife and run DWI Pipeline</el-dropdown-item>
                             </el-dropdown-menu>
                         </template>
                     </el-dropdown>
@@ -148,6 +149,7 @@ export default defineComponent({
     data() {
         return {
             submitting: false, //prevent double submit
+            writingDataset: false,
             activeLogs: [],
         };
     },
@@ -156,6 +158,9 @@ export default defineComponent({
         ...mapState(['ezbids', 'config', 'bidsSchema', 'session', 'events']),
         hasAuth() {
             return hasAuth();
+        },
+        supportsDirectoryPicker() {
+            return typeof (window as any).showDirectoryPicker === 'function';
         },
     },
 
@@ -186,7 +191,7 @@ export default defineComponent({
 
         dofinalize(cb: (err: string | null) => void) {
             //TODO - why can't server just look up the bids schema by itself!?
-            //mapping between things like like "subject" to "sub"
+            //mapping between things like "subject" and "sub"
             const entityMappings = {} as { [key: string]: string };
             for (const key in this.bidsSchema.entities) {
                 entityMappings[key] = this.bidsSchema.entities[key].entity;
@@ -280,6 +285,70 @@ export default defineComponent({
                     message: 'there was an error downloading the data',
                     type: 'error',
                 });
+            }
+        },
+
+        async writeToExistingDataset() {
+            const showDirectoryPicker = (window as any).showDirectoryPicker;
+
+            try {
+                // The picker must be opened directly from the user's click, before
+                // any network requests consume the browser's transient activation.
+                const datasetDirectory = await showDirectoryPicker({ mode: 'readwrite' });
+
+                this.writingDataset = true;
+                const res = await axios.get(`${this.config.apihost}/download/${this.session._id}/token`);
+                const shortLivedJWT = res.data;
+
+                const datasetName = encodeURIComponent(this.ezbids.datasetDescription.Name);
+                const baseUrl = `${this.config.apihost}/download/${this.session._id}/bids/${datasetName}`;
+                const manifestResponse = await fetch(
+                    `${baseUrl}?listSubjectFiles=true&token=${encodeURIComponent(shortLivedJWT)}`
+                );
+                if (!manifestResponse.ok) throw new Error('Failed to list subject files');
+
+                const subjectFiles = (await manifestResponse.json()) as string[];
+                for (const relativePath of subjectFiles) {
+                    const pathParts = relativePath.split('/');
+                    const fileName = pathParts.pop();
+                    let destinationDirectory = datasetDirectory;
+
+                    for (const directoryName of pathParts) {
+                        destinationDirectory = await destinationDirectory.getDirectoryHandle(directoryName, {
+                            create: true,
+                        });
+                    }
+
+                    const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
+                    const response = await fetch(
+                        `${baseUrl}/${encodedPath}?token=${encodeURIComponent(shortLivedJWT)}`
+                    );
+                    if (!response.ok) throw new Error(`Failed to download ${relativePath}`);
+
+                    const fileHandle = await destinationDirectory.getFileHandle(fileName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    if (response.body) {
+                        await response.body.pipeTo(writable);
+                    } else {
+                        await writable.write(await response.blob());
+                        await writable.close();
+                    }
+                }
+
+                ElNotification({
+                    message: `${subjectFiles.length} subject files were added to the existing BIDS dataset`,
+                    type: 'success',
+                });
+            } catch (e) {
+                if (e?.name !== 'AbortError') {
+                    console.error(e);
+                    ElNotification({
+                        message: 'there was an error writing to the existing BIDS dataset',
+                        type: 'error',
+                    });
+                }
+            } finally {
+                this.writingDataset = false;
             }
         },
 

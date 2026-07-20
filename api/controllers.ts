@@ -503,12 +503,49 @@ router.get('/download/:session_id/*', (req, res, next) => {
                 res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
                 return fs.createReadStream(fullpath).pipe(res);
             } else if (stats.isDirectory()) {
+                if (req.query.listSubjectFiles === 'true') {
+                    const subjectFiles: string[] = [];
+
+                    const collectFiles = (directory: string, relativeDirectory: string) => {
+                        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+                            const fullEntryPath = path.join(directory, entry.name);
+                            const relativeEntryPath = path.posix.join(relativeDirectory, entry.name);
+
+                            if (entry.isDirectory()) collectFiles(fullEntryPath, relativeEntryPath);
+                            else if (entry.isFile()) subjectFiles.push(relativeEntryPath);
+                        }
+                    };
+
+                    for (const entry of fs.readdirSync(fullpath, { withFileTypes: true })) {
+                        if (entry.isDirectory() && entry.name.startsWith('sub-')) {
+                            collectFiles(path.join(fullpath, entry.name), entry.name);
+                        }
+                    }
+
+                    return res.json(subjectFiles);
+                }
+
                 res.setHeader('Content-disposition', 'attachment; filename=' + path.basename(fullpath) + '.zip');
                 res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-                const archive = archiver('zip', {
-                    zlib: { level: 0 },
-                });
-                archive.directory(fullpath, 'bids');
+
+                const archive = archiver('zip', { zlib: { level: 0 } });
+                const excludeToplevel = req.query.excludeToplevel === 'true';
+
+                if (excludeToplevel) {
+                    // Put subject directories at the archive root so the ZIP can be
+                    // extracted directly into an existing BIDS dataset.
+                    const entries = fs.readdirSync(fullpath);
+                    for (const entry of entries) {
+                        const fullPath = path.join(fullpath, entry);
+                        const stat = fs.lstatSync(fullPath);
+                        if (stat.isDirectory() && entry.startsWith('sub-')) {
+                            archive.directory(fullPath, entry);
+                        }
+                    }
+                } else {
+                    archive.directory(fullpath, 'bids');
+                }
+
                 archive.finalize();
                 return archive.pipe(res);
             } else return next('weird file');
