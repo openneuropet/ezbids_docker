@@ -108,7 +108,21 @@ if pet_folders:
         if len(ecats):
             for ecat in ecats:
                 if ecat not in pet_ecat_files_list:
-                    pet_ecat_files_list.append(f"{pet}/{ecat}")
+                    pet_ecat_files_list.append(f'{pet}/{ecat}')
+        # pypet2bids handles tar archives itself and copies adjacent PET
+        # spreadsheets into its temporary extraction directory. Pass archives
+        # directly so they are not mistaken for an ordinary PET directory.
+        archives = [
+            x for x in os.listdir(pet)
+            if x.lower().endswith(('.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tar.xz'))
+        ]
+        if len(archives):
+            for archive in archives:
+                archive_path = f'{pet}/{archive}'
+                if archive_path not in pet_dcm_dirs_list:
+                    pet_dcm_dirs_list.append(archive_path)
+            continue
+
         # See if we're dealing with DICOM files
         dcms = [
             x
