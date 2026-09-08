@@ -71,6 +71,7 @@ services:
         environment:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
             PRESORT: ${PRESORT:-false}
+            PET2BIDS_ENABLED: ${PET2BIDS_ENABLED:-true}
         networks:
             - ezbids
         tty: true #turn on color for bids-validator output
