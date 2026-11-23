@@ -47,6 +47,8 @@ test('authentication defaults to local unless Brainlife is enabled; explicit mod
         const result = spawnSync(
             process.execPath,
             [
+                '--require',
+                require.resolve('./register-api-typescript.cjs'),
                 '-e',
                 `const config = require(${JSON.stringify(configPath)}); console.log(JSON.stringify({ mode: config.authMode, registration: config.registrationEnabled }));`,
             ],

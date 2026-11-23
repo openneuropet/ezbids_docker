@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILES = ('docker-compose.yml', 'docker-compose-dev.yaml', 'docker-compose-nginx.yml')
 SETTINGS = ('EZBIDS_ALLOWED_ORIGINS', 'EZBIDS_SECURE_COOKIES', 'EZBIDS_AUTH_MODE',
             'EZBIDS_REGISTRATION_ENABLED', 'VITE_APIHOST', 'VITE_BRAINLIFE_AUTHENTICATION',
-            'VITE_EZBIDS_AUTH_MODE')
+            'VITE_EZBIDS_AUTH_MODE', 'EZBIDS_TRUSTED_PROXIES', 'EZBIDS_TRUSTED_PROXY_NAMES')
 
 
 class DeploymentConfigTest(unittest.TestCase):
@@ -66,6 +66,8 @@ class DeploymentConfigTest(unittest.TestCase):
                 else:
                     self.assertIn('http://deploy.example.org:3000', api['EZBIDS_ALLOWED_ORIGINS'].split(','))
                     self.assertEqual(api['EZBIDS_SECURE_COOKIES'], 'false')
+                self.assertEqual(api['EZBIDS_TRUSTED_PROXY_NAMES'], 'nginx' if file == 'docker-compose-nginx.yml' else '')
+                self.assertEqual(api['EZBIDS_TRUSTED_PROXIES'], '')
                 self.assertIn('handler', services)
                 self.assertEqual(Path(services['api']['volumes'][0]['source']),
                                  Path(services['handler']['volumes'][0]['source']))
@@ -73,7 +75,8 @@ class DeploymentConfigTest(unittest.TestCase):
     def test_explicit_settings_reach_all_compose_deployments(self):
         expected = dict(EZBIDS_ALLOWED_ORIGINS='https://one.example.org,https://two.example.org',
                         EZBIDS_SECURE_COOKIES='false', EZBIDS_AUTH_MODE='local',
-                        EZBIDS_REGISTRATION_ENABLED='false')
+                        EZBIDS_REGISTRATION_ENABLED='false',
+                        EZBIDS_TRUSTED_PROXIES='192.0.2.10/32', EZBIDS_TRUSTED_PROXY_NAMES='edge')
         content = '\n'.join(f'{key}={value}' for key, value in expected.items()) + '\n'
         for file in COMPOSE_FILES:
             with self.subTest(file=file):

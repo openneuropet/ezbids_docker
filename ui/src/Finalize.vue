@@ -303,7 +303,8 @@ export default defineComponent({
                 const datasetName = encodeURIComponent(this.ezbids.datasetDescription.Name);
                 const baseUrl = `${this.config.apihost}/download/${this.session._id}/bids/${datasetName}`;
                 const manifestResponse = await fetch(
-                    `${baseUrl}?listSubjectFiles=true&token=${encodeURIComponent(shortLivedJWT)}`
+                    `${baseUrl}?listSubjectFiles=true&token=${encodeURIComponent(shortLivedJWT)}`,
+                    { credentials: 'include' }
                 );
                 if (!manifestResponse.ok) throw new Error('Failed to list subject files');
 
@@ -321,7 +322,8 @@ export default defineComponent({
 
                     const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
                     const response = await fetch(
-                        `${baseUrl}/${encodedPath}?token=${encodeURIComponent(shortLivedJWT)}`
+                        `${baseUrl}/${encodedPath}?token=${encodeURIComponent(shortLivedJWT)}`,
+                        { credentials: 'include' }
                     );
                     if (!response.ok) throw new Error(`Failed to download ${relativePath}`);
 

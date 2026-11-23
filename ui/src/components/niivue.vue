@@ -9,7 +9,7 @@ import { defineComponent } from 'vue';
 import { mapState } from 'vuex';
 
 // @ts-ignore
-import { Niivue } from '@niivue/niivue';
+import { Niivue, NVImage } from '@niivue/niivue';
 import axios from '../axios.instance';
 
 const nv = new Niivue({
@@ -40,23 +40,21 @@ export default defineComponent({
     },
 
     methods: {
-        load() {
-            axios.get(`${this.config.apihost}/download/${this.session._id}/token`).then((res) => {
-                const url = `${this.config.apihost}/download/${this.session._id}/${this.path}?token=${res.data}`;
-                this.open = true;
-                this.$nextTick(() => {
-                    nv.attachToCanvas(this.$refs.canvas);
-                    nv.loadVolumes([
-                        {
-                            url: url,
-                            volume: { hdr: null, img: null },
-                            colorMap: 'gray',
-                            opacity: 1,
-                            visible: true,
-                        },
-                    ]);
-                });
-            });
+        async load() {
+            const requestedPath = this.path;
+            const token = await axios.get(`${this.config.apihost}/download/${this.session._id}/token`);
+            const url = `${this.config.apihost}/download/${this.session._id}/${requestedPath}?token=${encodeURIComponent(token.data)}`;
+            // Niivue 0.21.1 uses bare fetch(url), which omits cookies across
+            // ports. Download through our credential-aware Axios client and
+            // give Niivue the bytes instead of weakening download authorization.
+            const response = await axios.get(url, { responseType: 'arraybuffer' });
+            if (this.path !== requestedPath) return;
+            this.open = true;
+            await this.$nextTick();
+            await nv.attachToCanvas(this.$refs.canvas);
+            const volume = new NVImage(response.data, requestedPath.split('/').pop(), 'gray', 1);
+            for (const previous of [...nv.volumes]) nv.removeVolume(previous);
+            nv.addVolume(volume);
         },
 
         close() {

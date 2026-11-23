@@ -259,11 +259,21 @@ For the nginx image, UI assets are built ahead of time; runtime auth configurati
 comes from the API, rather than Compose's UI environment at container startup.
 
 Users can convert as guests without registering or logging in. Guests access their
-work using a signed browser cookie (valid for 30 days); other browsers and accounts
+work using an opaque browser cookie backed by MongoDB (valid for 30 days); other browsers and accounts
 cannot open those sessions. Guest work is not added to an account's history.
 Users who register and log in can open their own previous uploads from **My sessions**.
 Session reads, uploads, changes, and downloads enforce ownership on the server;
 local accounts cannot share sessions or access another account's session by URL.
+Password-hashing work is limited independently of client connections, so closing
+a request does not leak a slot or release one while hashing is still running.
+Login limits use the socket peer IP by default. The nginx Compose deployment
+trusts only addresses resolved for its private `nginx` service, refreshing that
+resolution and failing closed if DNS is unavailable. Direct API ports ignore
+forwarding headers. For a different reverse proxy, explicitly set
+`EZBIDS_TRUSTED_PROXIES` to its exact peer addresses/CIDRs, or
+`EZBIDS_TRUSTED_PROXY_NAMES` to trusted private-network DNS names. Do not trust
+arbitrary forwarding headers or the whole container subnet.
+
 Passwords use salted scrypt hashes. Login cookies are HttpOnly, expire after seven
 days, and are revoked on logout. Set `EZBIDS_REGISTRATION_ENABLED=false` to close
 registration while allowing existing users to log in. There is no email
@@ -287,11 +297,15 @@ Leaving `EZBIDS_AUTH_MODE` unset selects `brainlife` when
 Disabling authentication allows anonymous access, so use `local` consistently on
 all API instances when deploying private accounts.
 
-Compile the API (`cd api && ../node_modules/.bin/tsc`) before running
-`npm run test:auth`. To include the database integration suite, set
-`EZBIDS_TEST_MONGO_URL=mongodb://HOST:PORT/ezbids_auth_test` to a disposable MongoDB
-instance. The suite creates accounts and sessions and drops that test database
-when finished; it refuses any other database name.
+Run `npm run test:auth` to exercise policy, security, and credentialed-download
+regressions. Tests transpile API TypeScript in memory rather than overwriting
+JavaScript used by running services. To include the database integration suite,
+set `EZBIDS_TEST_MONGO_URL=mongodb://HOST:PORT/ezbids_auth_test` to an explicitly
+disposable MongoDB instance. That suite creates accounts/sessions, uses a separate
+temporary upload directory, and drops only that test database when finished; it
+refuses any other database name. Run the bundled client checks with
+`python3 -m unittest discover -s test -p client_cookie_test.py`.
+
 Deployment configuration checks run separately with
 `python3 -m unittest discover -s test -p deployment_config_test.py`. They render
 Compose configuration and stub service launches and certificate generation;
@@ -300,6 +314,65 @@ runtime environment inheritance, set `EZBIDS_TEST_COMBINED_IMAGE` to a locally
 built combined image when running the same command. That optional check starts
 an isolated container with networking disabled and substitutes environment-reporting
 processes for the API and UI.
+
+#### Guest authentication upgrade and recovery
+
+New guest cookies are opaque random tokens; only their hashes and expiry are
+stored in MongoDB. They survive image/key replacement as long as the existing
+database is preserved. Image-generated RSA keys continue to serve short-lived
+download tokens; they are no longer the persistent credential for new guests.
+
+Before replacing a deployment that has signed guest cookies from commit
+`b5af806`, preserve its **public verification key** in the database. Do this while
+the old API is still running, using the candidate image's migration command:
+
+1. Record the current API image and MongoDB volume, and take your normal database
+   backup. Keep the existing database/volume attached; do not use `down -v` or
+   renew anonymous volumes. Named-volume conversion is a separate migration.
+2. Copy the public key from the **currently running API**, before rebuilding or
+   replacing it. Substitute its actual container name below:
+
+   ```bash
+   docker cp ezbids-api:/app/api/ezbids.pub /tmp/ezbids-legacy-guest.pub
+   ```
+
+3. Build the candidate API image while the old service continues running. Using
+   your deployment's Compose file, run this one-shot command against the same
+   database. It does not start the API or process uploads:
+
+   ```bash
+   docker compose run --rm --no-deps \
+     -v /tmp/ezbids-legacy-guest.pub:/migration/guest.pub:ro \
+     api bash -lc '../node_modules/.bin/tsc && node preserve-guest-key.js --public-key /migration/guest.pub'
+   ```
+
+   Repeat for each old signing key if API replicas used different images. The
+   import is an idempotent atomic upsert and stores public keys only. A failed
+   import leaves the running old API untouched; stop the rollout and correct it
+   before replacing any service. Never export or print private keys.
+4. Schedule API replacement after active uploads have finished. A single-instance
+   replacement has an availability gap; these scripts do not implement rolling
+   deployment. The new API listens (and passes health checks) only after database
+   setup and guest-key migration checks succeed. It refuses readiness if existing
+   legacy guest-owned sessions are found without a preserved verification key.
+5. Old signed cookies keep their guest identity and original expiry when exchanged
+   for opaque cookies. No anonymous legacy sessions are automatically claimed.
+   Preserve MongoDB and the imported keys during recovery. Once opaque cookies
+   have been issued, rollback must use an opaque-cookie-compatible image, or a
+   forward fix: `b5af806` cannot read the new cookie format. Do not rotate/delete
+   the old verifier or replace the database as a recovery step.
+
+For combined Docker/Apptainer, import the current public key into the same
+persistent MongoDB using the migration script before replacing the image. Do not
+assume a new image's generated key can verify an older deployment's cookies. No
+private-key bind mounts or automatic key/file replacement are introduced here.
+Existing ten-minute download links may still expire during an image replacement.
+
+“Send to OpenNeuro” remains an untested integration requiring separate OAuth and
+sharing design. Local-mode downloads still require the owner cookie plus a
+short-lived token; that protection is not relaxed to support third-party imports.
+No OpenNeuro transfer is performed by these tests. Niivue receives authenticated
+image bytes through the same credential-aware client as other browser downloads.
 
 #### Nginx Setup
 

@@ -5,10 +5,13 @@ import * as config from './config';
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { LoginSession, User } from './models';
+import { createWorkLimiter } from './auth-work';
+import { resolveGuest, newGuest, prepareGuestKeys } from './guest-auth';
 
 const pubkey = config.authMode === 'brainlife' ? fs.readFileSync(__dirname + '/auth.pub', 'ascii').trim() : null;
 const ezbidsPrivateKey = fs.readFileSync(`${__dirname}/ezbids.key`, 'ascii').trim();
 const ezbidsPublicKey = fs.readFileSync(`${__dirname}/ezbids.pub`, 'ascii').trim();
+export const prepareGuestAuthentication = () => prepareGuestKeys(ezbidsPublicKey);
 
 export const validateWithJWTConfig = (options?: Params) => {
     if (config.authMode === 'local') return validateOptionalLocalSession;
@@ -44,15 +47,16 @@ export const signJWT = (claims: { sessionId: string }, signInOpts?: jwt.SignOpti
 
 export const normalizeEmail = (email: unknown): string => (typeof email === 'string' ? email.trim().toLowerCase() : '');
 const scryptAsync = promisify(scrypt);
+const runPasswordHash = createWorkLimiter(4);
 export async function hashPassword(password: string): Promise<string> {
     const salt = randomBytes(16).toString('hex');
-    const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+    const hash = (await runPasswordHash(() => scryptAsync(password, salt, 64))) as Buffer;
     return `scrypt$${salt}$${hash.toString('hex')}`;
 }
 export async function checkPassword(password: string, stored: string): Promise<boolean> {
     const [algorithm, salt, hex] = stored.split('$');
     if (algorithm !== 'scrypt' || !salt || !hex || hex.length !== 128) return false;
-    const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+    const hash = (await runPasswordHash(() => scryptAsync(password, salt, 64))) as Buffer;
     return timingSafeEqual(hash, Buffer.from(hex, 'hex'));
 }
 export const cookieName = 'ezbids_login';
@@ -101,7 +105,7 @@ export async function validateLocalSession(req, res, next) {
     }
 }
 // Guests can convert without an account. Their work remains private to the
-// browser holding this signed cookie; it is never added to account history.
+// browser holding its opaque cookie; it is never added to account history.
 export async function validateOptionalLocalSession(req, res, next) {
     try {
         const user = await findLocalUser(req);
@@ -110,29 +114,19 @@ export async function validateOptionalLocalSession(req, res, next) {
             req.localUser = user;
             return next();
         }
-        let guestId: string;
-        try {
-            const claims = jwt.verify(readLoginToken(req, 'ezbids_guest'), ezbidsPublicKey, {
-                algorithms: ['RS256'],
-                audience: 'ezbids-guest',
-            }) as jwt.JwtPayload;
-            if (typeof claims.guestId === 'string' && /^[a-f0-9]{32}$/.test(claims.guestId)) guestId = claims.guestId;
-        } catch {
-            /* Missing or expired guest cookies cannot grant access to existing work. */
-        }
-        if (!guestId) {
+        let guest = await resolveGuest(readLoginToken(req, 'ezbids_guest'));
+        if (!guest) {
             if (req.method !== 'POST' || req.path !== '/session')
                 return res.status(401).json({ message: 'Session access requires the original browser or account' });
-            guestId = randomBytes(16).toString('hex');
-            const maxAge = 30 * 24 * 60 * 60 * 1000;
-            const token = jwt.sign({ guestId }, ezbidsPrivateKey, {
-                algorithm: 'RS256',
-                audience: 'ezbids-guest',
-                expiresIn: '30d',
-            });
-            res.cookie('ezbids_guest', token, { ...cookieOptions, maxAge });
+            guest = await newGuest();
         }
-        req.auth = { sub: `guest:${guestId}` };
+        if (guest.replacement) {
+            res.cookie('ezbids_guest', guest.replacement.token, {
+                ...cookieOptions,
+                expires: guest.replacement.expiresAt,
+            });
+        }
+        req.auth = { sub: guest.subject };
         return next();
     } catch (err) {
         next(err);

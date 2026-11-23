@@ -1,3 +1,4 @@
+import { storeUploads } from './upload-paths';
 import * as express from 'express';
 import { Request } from 'express-jwt';
 import { JwtPayload } from 'jsonwebtoken';
@@ -6,9 +7,7 @@ import { EzBIDSAuthRequestObject, HTTP_STATUS, validateUserCanAccessSession } fr
 import multer = require('multer');
 import path = require('path');
 import fs = require('fs');
-import mkdirp = require('mkdirp');
 import archiver = require('archiver');
-import async = require('async');
 
 import config = require('./config');
 import models = require('./models');
@@ -585,41 +584,12 @@ router.post(
     validateUserCanAccessSession(false),
     upload.any(),
     (req: any, res, next) => {
-        const session = req.ezBIDS.session;
-
-        //when a single file is uploaded paths becomes just a string. convert it to an array of 1
-        let paths = req.body.paths;
-        if (!Array.isArray(paths)) paths = [paths];
-        //same for mtimes
-        let mtimes = req.body.mtimes;
-        if (!Array.isArray(mtimes)) mtimes = [mtimes];
-
-        let idx = -1;
-        async.eachSeries(
-            req.files,
-            (file: any, nextFile) => {
-                idx++;
-                const srcPath = file.path;
-                const dirtyPath = `${config.workdir}/${session._id}/${paths[idx]}`;
-                const destPath = path.resolve(dirtyPath);
-                const mtime = mtimes[idx] / 1000; //browser uses msec.. filesystem uses sec since epoch
-
-                if (!destPath.startsWith(config.workdir)) {
-                    return nextFile(new Error(`invalid path: ${destPath}`));
-                }
-                const destdir = path.dirname(destPath);
-
-                //move the file over to workdir
-                mkdirp.sync(destdir);
-                fs.renameSync(srcPath, destPath);
-                if (mtime) fs.utimesSync(destPath, mtime, mtime);
-                return nextFile();
-            },
-            (err) => {
-                if (err) return next(err);
-                return res.send('ok');
-            }
-        );
+        try {
+            storeUploads(config.workdir, String(req.ezBIDS.session._id), req.files, req.body.paths, req.body.mtimes);
+            return res.send('ok');
+        } catch (error) {
+            return next(error);
+        }
     }
 );
 

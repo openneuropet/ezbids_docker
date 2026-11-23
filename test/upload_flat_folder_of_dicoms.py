@@ -21,6 +21,7 @@ from utilities import (
     upload_files,
     create_session,
     get_session_status,
+    http_session,
 )
 
 # Configuration
@@ -116,6 +117,15 @@ def test_upload_flat_folder_of_dicoms(active_host, web_driver, session):
     print("\nOpening browser to view progress...")
     sys.stdout.flush()
     web_driver.get(host_url)
+    # The API client created this guest session. Give the test browser the same
+    # identity before asking it to open the session URL.
+    for cookie in http_session(api_url).cookies:
+        browser_cookie = {'name': cookie.name, 'value': cookie.value,
+                          'path': cookie.path or '/', 'secure': cookie.secure,
+                          'httpOnly': cookie.has_nonstandard_attr('HttpOnly')}
+        if cookie.expires is not None:
+            browser_cookie['expiry'] = int(cookie.expires)
+        web_driver.add_cookie(browser_cookie)
 
     # Test initial page load and get started button
     get_started_button = WebDriverWait(web_driver, 10).until(
@@ -152,7 +162,7 @@ def test_upload_flat_folder_of_dicoms(active_host, web_driver, session):
             f"Uploading batch {i//batch_size + 1}/{(len(files_to_upload) + batch_size - 1)//batch_size} ({len(batch)} files)"
         )
         sys.stdout.flush()
-        upload_files(session_id, batch, api_url)
+        upload_files(session_id, batch, api_url, root_dir=local_test_data_path)
 
     # Mark upload as complete
     print("Marking upload as complete...")

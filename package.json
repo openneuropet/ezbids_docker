@@ -16,7 +16,8 @@
         "prepare-husky": "husky install",
         "create-admin": "node api/create-admin.js",
         "assign-legacy-sessions": "node api/assign-legacy-sessions.js",
-        "test:auth": "node --test test/access-policy.test.js test/local-auth.test.js"
+        "test:auth": "node --require ./test/register-api-typescript.cjs --test test/access-policy.test.js test/local-auth.test.js test/security-regressions.test.js test/download-credentials.test.js",
+        "preserve-guest-key": "node api/preserve-guest-key.js"
     },
     "author": "",
     "license": "MIT",
@@ -41,7 +42,8 @@
         "range-stream": "^1.1.0",
         "send-seekable": "^1.0.4",
         "swagger-jsdoc": "^6.2.8",
-        "swagger-ui-express": "^5.0.0"
+        "swagger-ui-express": "^5.0.0",
+        "proxy-addr": "^2.0.7"
     },
     "devDependencies": {
         "@types/async": "^3.2.12",

@@ -24,3 +24,14 @@ export const allowedOrigins = (process.env.EZBIDS_ALLOWED_ORIGINS || 'http://loc
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+// Empty by default for directly exposed API ports. Only deployment operators
+// may configure trusted peer addresses or private-network DNS service names.
+export const trustedProxies = (process.env.EZBIDS_TRUSTED_PROXIES || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+export const trustedProxyNames = (process.env.EZBIDS_TRUSTED_PROXY_NAMES || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);

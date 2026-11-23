@@ -3,6 +3,9 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const fs = require('node:fs/promises');
+const syncFs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 const mongoose = require('mongoose');
 
 // This suite only runs against an explicitly selected disposable database.
@@ -10,8 +13,27 @@ const mongoUrl = process.env.EZBIDS_TEST_MONGO_URL;
 if (!mongoUrl) {
     test('local authentication integration (set EZBIDS_TEST_MONGO_URL to run)', { skip: true }, () => {});
 } else {
-    if (!mongoUrl.endsWith('/ezbids_auth_test')) throw new Error('Test database must be named ezbids_auth_test');
-    const base = 'http://127.0.0.1:18082';
+    require('./disposable-mongo.cjs')(mongoUrl);
+    let base;
+    const crypto = require('node:crypto');
+    const jwt = require('jsonwebtoken');
+    const workdir = syncFs.mkdtempSync(path.join(os.tmpdir(), 'ezbids-auth-integration-'));
+    process.env.EZBIDS_TEST_WORKDIR = workdir;
+    process.env.EZBIDS_TEST_KEY_DIR = path.join(workdir, 'keys');
+    syncFs.mkdirSync(process.env.EZBIDS_TEST_KEY_DIR);
+    function generateFixtureKeys() {
+        const keys = crypto.generateKeyPairSync('rsa', {
+            modulusLength: 2048,
+            publicKeyEncoding: { type: 'spki', format: 'pem' },
+            privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+        });
+        syncFs.writeFileSync(path.join(process.env.EZBIDS_TEST_KEY_DIR, 'ezbids.key'), keys.privateKey, {
+            mode: 0o600,
+        });
+        syncFs.writeFileSync(path.join(process.env.EZBIDS_TEST_KEY_DIR, 'ezbids.pub'), keys.publicKey);
+        return keys;
+    }
+    const originalKeys = generateFixtureKeys();
     process.env.MONGO_CONNECTION_STRING = mongoUrl;
     delete process.env.EZBIDS_AUTH_MODE;
     process.env.BRAINLIFE_AUTHENTICATION = 'false';
@@ -46,16 +68,15 @@ if (!mongoUrl) {
         assert.match(response.headers.get('set-cookie'), /SameSite=Lax/);
         return { cookie: cookieOf(response), user: data.user };
     }
-    before(async () => {
-        await new Promise((resolve, reject) => models.connect((err) => (err ? reject(err) : resolve())));
-        await Promise.all([
-            models.User.deleteMany({}),
-            models.LoginSession.deleteMany({}),
-            models.Session.deleteMany({}),
-        ]);
-        server = spawn(process.execPath, ['api/ezbids.js'], {
-            env: { ...process.env, PORT: '18082', HOST: '127.0.0.1', EZBIDS_REGISTRATION_ENABLED: 'true' },
-        });
+    async function startFixtureApi() {
+        serverOutput = '';
+        server = spawn(
+            process.execPath,
+            ['--require', require.resolve('./register-api-typescript.cjs'), 'api/ezbids.ts'],
+            {
+                env: { ...process.env, PORT: '0', HOST: '127.0.0.1', EZBIDS_REGISTRATION_ENABLED: 'true' },
+            }
+        );
         server.stdout.on('data', (data) => {
             serverOutput += data;
         });
@@ -64,12 +85,32 @@ if (!mongoUrl) {
         });
         for (let i = 0; i < 100; i++) {
             try {
-                if ((await request('/health')).ok) return;
+                const match = serverOutput.match(/warehouse api service running on .*?:(\d+)/);
+                if (match) base = `http://127.0.0.1:${match[1]}`;
+                if (match && (await request('/health')).ok) return;
             } catch {}
             if (server.exitCode !== null) throw new Error(serverOutput);
             await new Promise((resolve) => setTimeout(resolve, 100));
         }
         throw new Error('API did not start: ' + serverOutput);
+    }
+    async function stopFixtureApi() {
+        if (server && server.exitCode === null) {
+            const exited = once(server, 'exit');
+            server.kill();
+            await exited;
+        }
+    }
+    before(async () => {
+        await new Promise((resolve, reject) => models.connect((err) => (err ? reject(err) : resolve())));
+        await Promise.all([
+            models.User.deleteMany({}),
+            models.LoginSession.deleteMany({}),
+            models.Session.deleteMany({}),
+            models.GuestSession.deleteMany({}),
+            models.LegacyGuestKey.deleteMany({}),
+        ]);
+        await startFixtureApi();
     });
     after(async () => {
         if (server && server.exitCode === null) {
@@ -80,6 +121,7 @@ if (!mongoUrl) {
         for (const directory of files) await fs.rm(directory, { recursive: true, force: true });
         await mongoose.connection.dropDatabase();
         await mongoose.disconnect();
+        await fs.rm(workdir, { recursive: true, force: true });
     });
     test('runtime configuration enables local registration', async () => {
         assert.deepEqual(await (await request('/auth/config')).json(), { mode: 'local', registrationEnabled: true });
@@ -93,7 +135,7 @@ if (!mongoUrl) {
         const guestCookie = cookieOf(created);
         assert.match(guestCookie, /^ezbids_guest=/);
         const guestSession = await created.json();
-        assert.match(guestSession.ownerPrincipalId, /^local:guest:/);
+        assert.match(guestSession.ownerPrincipalId, /^local:guest-v2:/);
         assert.equal((await request(`/session/${guestSession._id}`, { cookie: guestCookie })).status, 200);
         assert.equal((await request('/sessions', { cookie: guestCookie })).status, 401);
         const second = await request('/session', { method: 'POST', body: {} });
@@ -101,7 +143,7 @@ if (!mongoUrl) {
         assert.equal((await request(`/session/${guestSession._id}`, { cookie: 'ezbids_guest=forged' })).status, 401);
         const repeated = await (await request('/session', { method: 'POST', cookie: guestCookie, body: {} })).json();
         assert.equal(repeated.ownerPrincipalId, guestSession.ownerPrincipalId);
-        const directory = `/tmp/${guestSession._id}`;
+        const directory = `${workdir}/${guestSession._id}`;
         files.push(directory);
         await fs.mkdir(directory, { recursive: true });
         await fs.writeFile(`${directory}/guest.txt`, 'private guest file');
@@ -217,7 +259,9 @@ if (!mongoUrl) {
         assert.equal((await request(`/session/${legacy._id}`, { cookie: alice.cookie })).status, 404);
         assert.equal((await request(`/session/${legacy._id}`, { cookie: bob.cookie })).status, 404);
         const assigned = spawn(process.execPath, [
-            'api/assign-legacy-sessions.js',
+            '--require',
+            require.resolve('./register-api-typescript.cjs'),
+            'api/assign-legacy-sessions.ts',
             '--email',
             alice.user.email,
             String(legacy._id),
@@ -227,7 +271,7 @@ if (!mongoUrl) {
         assert.equal((await request(`/session/${legacy._id}`, { cookie: bob.cookie })).status, 404);
     });
     test('downloads require the owner login and a token bound to the requested session', async () => {
-        const directory = `/tmp/${aliceSession._id}`;
+        const directory = `${workdir}/${aliceSession._id}`;
         files.push(directory);
         await fs.mkdir(directory, { recursive: true });
         await fs.writeFile(`${directory}/test.txt`, 'private session file');
@@ -277,6 +321,58 @@ if (!mongoUrl) {
             await models.Session.deleteMany({ _id: { $in: seeded.map((session) => session._id) } });
         }
     });
+    test('real multipart uploads stay inside the account session and clean rejected temporary files', async () => {
+        const victim = path.join(workdir, bobSession._id);
+        await fs.mkdir(victim, { recursive: true });
+        await fs.writeFile(path.join(victim, 'protected.txt'), 'unchanged');
+        async function upload(paths) {
+            const form = new FormData();
+            for (const relative of paths) {
+                form.append('files', new Blob(['fixture bytes']), 'fixture.txt');
+                form.append('paths', relative);
+                form.append('mtimes', '0');
+            }
+            return fetch(base + `/upload-multi/${aliceSession._id}`, {
+                method: 'POST',
+                headers: { Cookie: alice.cookie },
+                body: form,
+            });
+        }
+        assert.equal((await upload([`../${bobSession._id}/protected.txt`])).status, 400);
+        assert.equal((await upload(['nested/valid.txt'])).status, 200);
+        assert.equal(
+            await fs.readFile(path.join(workdir, aliceSession._id, 'nested/valid.txt'), 'utf8'),
+            'fixture bytes'
+        );
+        await fs.symlink(victim, path.join(workdir, aliceSession._id, 'escape'));
+        assert.equal((await upload(['escape/protected.txt'])).status, 400);
+        assert.equal((await upload(['would-write.txt', `../${bobSession._id}/protected.txt`])).status, 400);
+        assert.equal(syncFs.existsSync(path.join(workdir, aliceSession._id, 'would-write.txt')), false);
+        assert.equal(await fs.readFile(path.join(victim, 'protected.txt'), 'utf8'), 'unchanged');
+        assert.deepEqual(await fs.readdir(path.join(workdir, 'upload')), []);
+    });
+    test('guest identity survives API/key replacement and old signed cookies migrate with preserved public keys', async () => {
+        const guestResponse = await request('/session', { method: 'POST', body: {} });
+        const guestCookie = cookieOf(guestResponse);
+        const guest = await guestResponse.json();
+        const legacyId = 'c'.repeat(32);
+        const legacy = await models.Session.create({ ownerPrincipalId: `local:guest:${legacyId}`, status: 'created' });
+        const oldCookie =
+            'ezbids_guest=' +
+            jwt.sign({ guestId: legacyId }, originalKeys.privateKey, {
+                algorithm: 'RS256',
+                audience: 'ezbids-guest',
+                expiresIn: '1h',
+            });
+        await stopFixtureApi();
+        generateFixtureKeys();
+        await startFixtureApi();
+        assert.equal((await request(`/session/${guest._id}`, { cookie: guestCookie })).status, 200);
+        const migrated = await request(`/session/${legacy._id}`, { cookie: oldCookie });
+        assert.equal(migrated.status, 200);
+        assert.match(cookieOf(migrated), /^ezbids_guest=g1_/);
+        assert.equal((await request(`/session/${legacy._id}`, { cookie: cookieOf(migrated) })).status, 200);
+    });
     test('expired sessions, disabled accounts, and logout revoke access', async () => {
         const { tokenHash } = require('../api/auth');
         await models.LoginSession.updateOne(
@@ -295,22 +391,34 @@ if (!mongoUrl) {
         assert.equal((await request('/sessions', { cookie: alice.cookie })).status, 401);
     });
     test('registration can be disabled while existing users can log in with secure cookies', async () => {
-        const restricted = spawn(process.execPath, ['api/ezbids.js'], {
-            env: {
-                ...process.env,
-                PORT: '18083',
-                HOST: '127.0.0.1',
-                EZBIDS_REGISTRATION_ENABLED: 'false',
-                EZBIDS_SECURE_COOKIES: 'true',
-            },
+        const restricted = spawn(
+            process.execPath,
+            ['--require', require.resolve('./register-api-typescript.cjs'), 'api/ezbids.ts'],
+            {
+                env: {
+                    ...process.env,
+                    PORT: '0',
+                    HOST: '127.0.0.1',
+                    EZBIDS_REGISTRATION_ENABLED: 'false',
+                    EZBIDS_SECURE_COOKIES: 'true',
+                },
+            }
+        );
+        let restrictedOutput = '',
+            restrictedBase;
+        restricted.stdout.on('data', (data) => {
+            restrictedOutput += data;
         });
-        restricted.stdout.resume();
-        restricted.stderr.resume();
+        restricted.stderr.on('data', (data) => {
+            restrictedOutput += data;
+        });
         try {
             let ready = false;
             for (let i = 0; i < 100; i++) {
                 try {
-                    if ((await fetch('http://127.0.0.1:18083/health')).ok) {
+                    const match = restrictedOutput.match(/warehouse api service running on .*?:(\d+)/);
+                    if (match) restrictedBase = `http://127.0.0.1:${match[1]}`;
+                    if (match && (await fetch(restrictedBase + '/health')).ok) {
                         ready = true;
                         break;
                     }
@@ -318,10 +426,10 @@ if (!mongoUrl) {
                 await new Promise((resolve) => setTimeout(resolve, 100));
             }
             assert.ok(ready);
-            assert.equal((await (await fetch('http://127.0.0.1:18083/auth/config')).json()).registrationEnabled, false);
+            assert.equal((await (await fetch(restrictedBase + '/auth/config')).json()).registrationEnabled, false);
             assert.equal(
                 (
-                    await fetch('http://127.0.0.1:18083/auth/register', {
+                    await fetch(restrictedBase + '/auth/register', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: '{}',
@@ -329,7 +437,7 @@ if (!mongoUrl) {
                 ).status,
                 403
             );
-            const login = await fetch('http://127.0.0.1:18083/auth/login', {
+            const login = await fetch(restrictedBase + '/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: alice.user.email, password }),

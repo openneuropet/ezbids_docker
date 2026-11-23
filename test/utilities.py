@@ -1,4 +1,6 @@
 import argparse
+import atexit
+from contextlib import ExitStack
 import os
 import sys
 import time
@@ -11,50 +13,45 @@ from urllib3.exceptions import InsecureRequestWarning
 # Disable SSL verification for self-signed certificates
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
+# A guest identity lives in a cookie. Reuse one client for every operation
+# against the same API, including callers that use the legacy helper functions.
+_http_sessions = {}
+
+
+def http_session(api_url: str):
+    key = api_url.rstrip('/')
+    if key not in _http_sessions:
+        _http_sessions[key] = requests.Session()
+        atexit.register(_http_sessions[key].close)
+    return _http_sessions[key]
+
 
 def create_session(api_url: str):
     """Create a new session for file upload"""
     # Remove any trailing slashes from the API URL
     api_url = api_url.rstrip("/")
 
-    response = requests.post(f"{api_url}/session", json={}, verify=False)
+    response = http_session(api_url).post(f"{api_url}/session", json={}, verify=False)
     if response.status_code != 200:
         raise Exception(f"Failed to create session: {response.text}")
     return response.json()
 
 
-def upload_files(session_id: str, files: list, api_url: str):
-    """Upload files to the server"""
-    # Remove any trailing slashes from the API URL
-    api_url = api_url.rstrip("/")
-
-    # Prepare the form data
-    data = {"paths": [], "mtimes": []}
-    file_objects = []
-
-    # Add each file to the form data
-    for file_path in files:
-        data["paths"].append(file_path)
-        data["mtimes"].append(
-            int(os.path.getmtime(file_path) * 1000)
-        )  # Convert to milliseconds
-        file_objects.append(("files", open(file_path, "rb")))
-
-    # Upload the files
-    response = requests.post(
-        f"{api_url}/upload-multi/{session_id}",
-        data=data,
-        files=file_objects,
-        verify=False,
-    )
-
-    # Close all file objects
-    for _, file_obj in file_objects:
-        file_obj.close()
-
+def upload_files(session_id: str, files: list, api_url: str, root_dir=None):
+    """Upload files with session-relative POSIX paths and the creating guest cookie."""
+    api_url = api_url.rstrip('/')
+    paths = [Path(name).resolve() for name in files]
+    if not paths:
+        raise ValueError('No files to upload')
+    base = Path(root_dir).resolve() if root_dir is not None else Path(os.path.commonpath([str(name.parent) for name in paths]))
+    data = {'paths': [name.relative_to(base).as_posix() for name in paths],
+            'mtimes': [int(name.stat().st_mtime * 1000) for name in paths]}
+    with ExitStack() as stack:
+        file_objects = [('files', stack.enter_context(name.open('rb'))) for name in paths]
+        response = http_session(api_url).post(f'{api_url}/upload-multi/{session_id}',
+                                              data=data, files=file_objects, verify=False)
     if response.status_code != 200:
-        raise Exception(f"Failed to upload files: {response.text}")
-
+        raise Exception(f'Failed to upload files: {response.text}')
     return response.text
 
 
@@ -63,7 +60,7 @@ def mark_upload_complete(session_id, api_url):
     # Remove any trailing slashes from the API URL
     api_url = api_url.rstrip("/")
 
-    response = requests.patch(f"{api_url}/session/uploaded/{session_id}", verify=False)
+    response = http_session(api_url).patch(f"{api_url}/session/uploaded/{session_id}", verify=False)
     if response.status_code != 200:
         raise Exception(f"Failed to mark upload as complete: {response.text}")
     return response.text
@@ -75,7 +72,7 @@ def get_session_status(session_id, api_url):
     # Remove any trailing slashes from the API URL
     api_url = api_url.rstrip("/")
 
-    response = requests.get(f"{api_url}/session/{session_id}", verify=False)
+    response = http_session(api_url).get(f"{api_url}/session/{session_id}", verify=False)
     if response.status_code != 200:
         raise Exception(f"Failed to get session status: {response.text}")
     return response.json()
@@ -150,7 +147,7 @@ def cli():
                 f"Uploading batch {i//args.batchsize + 1}/{(len(files_to_upload) + args.batchsize - 1)//args.batchsize} ({len(batch)} files)"
             )
             sys.stdout.flush()
-            upload_files(session_id, batch, api_url)
+            upload_files(session_id, batch, api_url, root_dir=args.data)
     except Exception as e:
         print(f"Error uploading files: {str(e)}")
         return
@@ -203,6 +200,7 @@ def cli():
         session_url = f"{args.url}/ezbids/convert#{session_id}"
 
     print(f"\nCheck your conversion/upload status at {session_url}")
+    print("Guest access belongs to this HTTP client; a separate browser does not automatically share its cookie.")
     print("You can close this window when done.")
 
 

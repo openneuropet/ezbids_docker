@@ -29,6 +29,8 @@ export function connect(cb: CallbackWithoutResult) {
             try {
                 await User.init();
                 await LoginSession.init();
+                await GuestSession.init();
+                await LegacyGuestKey.init();
             } catch (indexError) {
                 return cb(indexError);
             }
@@ -159,3 +161,18 @@ const loginSessionSchema = new Schema({
     expiresAt: { type: Date, required: true, expires: 0 },
 });
 export const LoginSession = model('LoginSession', loginSessionSchema);
+
+const guestSessionSchema = new Schema({
+    tokenHash: { type: String, required: true, unique: true },
+    guestId: { type: String, required: true },
+    legacy: { type: Boolean, default: false },
+    expiresAt: { type: Date, required: true, expires: 0 },
+});
+export const GuestSession = model('GuestSession', guestSessionSchema);
+export const LegacyGuestKey = model(
+    'LegacyGuestKey',
+    new Schema({
+        keyId: { type: String, required: true, unique: true },
+        publicKey: { type: String, required: true },
+    })
+);

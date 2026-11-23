@@ -1,3 +1,4 @@
+import { createAuthAttemptLimiter } from './auth-attempts';
 import * as express from 'express';
 import * as config from './config';
 import { User, LoginSession } from './models';
@@ -20,28 +21,9 @@ router.get('/config', (_req, res) =>
 );
 router.use((_req, res, next) => (config.authMode === 'local' ? next() : res.sendStatus(404)));
 
-// Bound password hashing work and repeated login attempts, without storing credentials.
-let hashingRequests = 0;
-const attempts = new Map<string, { count: number; until: number }>();
-router.use((req, res, next) => {
-    if (req.method !== 'POST' || !['/login', '/register'].includes(req.path)) return next();
-    if (!req.is('application/json')) return res.status(415).json({ message: 'JSON is required' });
-    const now = Date.now();
-    for (const [key, value] of attempts) if (value.until <= now) attempts.delete(key);
-    const key = req.ip;
-    const entry = attempts.get(key) || { count: 0, until: now + 15 * 60 * 1000 };
-    if (entry.count >= 30 || (!attempts.has(key) && attempts.size >= 10000)) {
-        return res.status(429).json({ message: 'Too many attempts. Please try again later.' });
-    }
-    if (hashingRequests >= 4) return res.status(429).json({ message: 'Please try again shortly' });
-    hashingRequests++;
-    res.once('finish', () => {
-        hashingRequests--;
-    });
-    entry.count++;
-    attempts.set(key, entry);
-    next();
-});
+// Work concurrency is bounded by hashPassword/checkPassword independently of
+// the HTTP response lifecycle. This middleware bounds repeated attempts only.
+router.use(createAuthAttemptLimiter());
 router.post('/register', async (req, res, next) => {
     if (!config.registrationEnabled) return res.status(403).json({ message: 'Registration is disabled' });
     const email = normalizeEmail(req.body.email);
@@ -72,8 +54,9 @@ router.post('/register', async (req, res, next) => {
         next(err);
     }
 });
-// Use a dummy hash for unknown accounts so that the expensive work is comparable.
-let dummyHash: Promise<string>;
+// A synthetic record still performs one scrypt for unknown accounts. No extra
+// bootstrap hash (or cached rejected promise) competes for the bounded slots.
+const dummyHash = `scrypt$unknown-account-placeholder-salt$${'0'.repeat(128)}`;
 router.post('/login', async (req, res, next) => {
     const email = normalizeEmail(req.body.email);
     const password = req.body.password;
@@ -81,8 +64,7 @@ router.post('/login', async (req, res, next) => {
         return res.status(401).json({ message: 'Email or password is incorrect' });
     try {
         const user = await User.findOne({ email }).select('+passwordHash');
-        if (!dummyHash) dummyHash = hashPassword('invalid-account-placeholder');
-        const valid = await checkPassword(password, user?.passwordHash || (await dummyHash));
+        const valid = await checkPassword(password, user?.passwordHash || dummyHash);
         if (!valid || !user || user.disabled)
             return res.status(401).json({ message: 'Email or password is incorrect' });
         await startLogin(user, res);

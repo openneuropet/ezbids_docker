@@ -5,6 +5,8 @@ import bodyParser = require('body-parser');
 import compression = require('compression');
 import cors = require('cors');
 import nocache = require('nocache');
+import { configureProxyTrust } from './proxy-trust';
+import { prepareGuestAuthentication } from './auth';
 
 import models = require("./models");
 import config = require("./config");
@@ -28,6 +30,7 @@ const options = {
 const swaggerSpec = swaggerJsdoc(options);
 //init express
 const app: express.Application = express();
+configureProxyTrust(app, config.trustedProxies, config.trustedProxyNames);
 app.use((req, res, next) => {
     if (config.authMode === 'local') {
         const origin = req.headers.origin;
@@ -77,12 +80,21 @@ process.on('uncaughtException', err => {
     console.error(err.stack)
 });
 
-models.connect(err => {
+models.connect(async err => {
     if (err) throw err;
+    try {
+        if (config.authMode === 'local') await prepareGuestAuthentication();
+    } catch (failure) {
+        console.error((failure as Error).message);
+        models.disconnect(() => process.exit(1));
+        return;
+    }
     var port = parseInt(process.env.PORT || config.express.port || '8082');
     var host = process.env.HOST || config.express.host || 'localhost';
     var server = app.listen(port, host, function () {
-        console.log("warehouse api service running on %s:%d in %s mode", host, port, app.settings.env);
+        const address = server.address();
+        const listeningPort = typeof address === 'object' && address ? address.port : port;
+        console.log("warehouse api service running on %s:%d in %s mode", host, listeningPort, app.settings.env);
     });
 });
 
