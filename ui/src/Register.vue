@@ -2,25 +2,34 @@
     <AuthLayout title="Create an ezBIDS account">
         <el-form label-position="top" @submit.prevent="submit">
             <el-form-item label="Name">
-                <el-input v-model.trim="displayName" autocomplete="name" />
+                <el-input v-model.trim="displayName" data-testid="register-name" autocomplete="name" />
             </el-form-item>
             <el-form-item label="Email">
-                <el-input v-model.trim="email" type="email" autocomplete="username" />
+                <el-input v-model.trim="email" data-testid="register-email" type="email" autocomplete="username" />
             </el-form-item>
             <el-form-item label="Password">
-                <el-input v-model="password" type="password" autocomplete="new-password" show-password />
+                <el-input
+                    v-model="password"
+                    data-testid="register-password"
+                    type="password"
+                    autocomplete="new-password"
+                    show-password
+                />
             </el-form-item>
             <el-form-item label="Confirm password">
                 <el-input
                     v-model="confirmPassword"
+                    data-testid="register-confirm"
                     type="password"
                     autocomplete="new-password"
                     show-password
                     @keyup.enter="submit"
                 />
             </el-form-item>
-            <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
-            <el-button class="submit" type="primary" :loading="submitting" @click="submit">Create account</el-button>
+            <el-alert v-if="error" data-testid="auth-error" :title="error" type="error" :closable="false" show-icon />
+            <el-button data-testid="register-submit" class="submit" type="primary" :loading="submitting" @click="submit"
+                >Create account</el-button
+            >
             <p class="alternate">Already registered? <router-link to="/login">Log in</router-link></p>
             <p class="alternate"><router-link to="/convert">Continue as guest</router-link></p>
         </el-form>

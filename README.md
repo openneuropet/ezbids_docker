@@ -297,6 +297,10 @@ Leaving `EZBIDS_AUTH_MODE` unset selects `brainlife` when
 Disabling authentication allows anonymous access, so use `local` consistently on
 all API instances when deploying private accounts.
 
+For browser-driven upload, metadata editing, conversion, validation, and BIDS
+download tests against an isolated container stack, see the
+[functional test instructions](test/functional/README.md).
+
 Run `npm run test:auth` to exercise policy, security, and credentialed-download
 regressions. Tests transpile API TypeScript in memory rather than overwriting
 JavaScript used by running services. To include the database integration suite,

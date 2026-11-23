@@ -1,7 +1,7 @@
 <template>
-    <el-button @click="initForm()">Edit Metadata</el-button>
+    <el-button data-testid="metadata-open" @click="initForm()">Edit Metadata</el-button>
     <el-dialog v-model="showDialog" title="Relevant Metadata">
-        <el-form ref="form" :model="formData" label-position="top" label-width="500px" :inline="true" :rules="rules">
+        <el-form ref="form" data-testid="metadata-dialog" :model="formData" label-position="top" label-width="500px" :inline="true" :rules="rules">
             <el-row>
                 <el-col :span="8" class="grid-content required-bg">
                     <!-- // make the label recommended below and show example for boolean types, also try to enforce the types in the form -->
@@ -13,6 +13,10 @@
                         v-for="(item, index) in fields.required"
                         :key="'required' + index"
                         class="editModalityInputItem"
+                        data-testid="metadata-field"
+                        :data-field="item.field"
+                        :data-input-type="inputType(item)"
+                        :data-value-type="formatType(item.details.type)"
                         :label="`${item.details.display_name} ${item.details.type}`"
                         :prop="item.field"
                     >
@@ -115,6 +119,7 @@
                                 <el-col :span="8">
                                     <el-select
                                         v-model="item.details.type"
+                                        data-testid="metadata-type"
                                         class="m-2"
                                         placeholder="Select Type"
                                         size="small"
@@ -149,6 +154,10 @@
                         v-for="(item, index) in fields.recommended"
                         :key="'recommended' + index"
                         class="editModalityInputItem"
+                        data-testid="metadata-field"
+                        :data-field="item.field"
+                        :data-input-type="inputType(item)"
+                        :data-value-type="formatType(item.details.type)"
                         :label="`${item.details.display_name}`"
                         :prop="item.field"
                     >
@@ -260,6 +269,7 @@
                                 <el-col :span="8">
                                     <el-select
                                         v-model="item.details.type"
+                                        data-testid="metadata-type"
                                         class="m-2"
                                         placeholder="Select Type"
                                         size="small"
@@ -294,6 +304,10 @@
                         v-for="(item, index) in fields.optional"
                         :key="'optional' + index"
                         class="editModalityInputItem"
+                        data-testid="metadata-field"
+                        :data-field="item.field"
+                        :data-input-type="inputType(item)"
+                        :data-value-type="formatType(item.details.type)"
                         :label="`${item.details.display_name}`"
                         :prop="item.field"
                     >
@@ -402,6 +416,7 @@
                                 <el-col :span="8">
                                     <el-select
                                         v-model="item.details.type"
+                                        data-testid="metadata-type"
                                         class="m-2"
                                         placeholder="Select Type"
                                         size="small"
@@ -431,6 +446,10 @@
                         v-for="(item, index) in fields.conditional"
                         :key="'conditional' + index"
                         class="editModalityInputItem"
+                        data-testid="metadata-field"
+                        :data-field="item.field"
+                        :data-input-type="inputType(item)"
+                        :data-value-type="formatType(item.details.type)"
                         :label="`${item.details.display_name}`"
                         :prop="item.field"
                     >
@@ -539,6 +558,7 @@
                                 <el-col :span="8">
                                     <el-select
                                         v-model="item.details.type"
+                                        data-testid="metadata-type"
                                         class="m-2"
                                         placeholder="Select Type"
                                         size="small"
@@ -570,7 +590,7 @@
 
         <span class="dialog-footer">
             <el-button @click="showDialog = false">Cancel</el-button>
-            <el-button type="primary" @click="submitForm">Submit</el-button>
+            <el-button data-testid="metadata-submit" type="primary" @click="submitForm">Submit</el-button>
         </span>
     </el-dialog>
 </template>
@@ -675,8 +695,9 @@ export default defineComponent({
             if (item.details.enum) return 'select-enum';
         },
         parseArrayValues(value, details) {
-            // type of value is stored details.
-            // item.details.items.type
+            if (details.items.type == 'string' && typeof value == 'string') {
+                return value.split(',').map((item: string) => item.trim());
+            }
             if (details.items.type == 'number') {
                 if (value.length > 0)
                     return value
@@ -1274,6 +1295,7 @@ export default defineComponent({
             }
 
             item.details.type = newValue;
+            this.rules = this.generateValidationRules(this.fields);
         },
     },
 });

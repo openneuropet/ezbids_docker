@@ -37,26 +37,32 @@ cp -r $root/finalized.json $root/ezBIDS_template.json
 echo "Creating ezBIDS telemetry files"
 ./telemetry.py $root
 
-pet2bids_server="http://openneuropet.org/telemetry/"
+# Preserve existing deployments' behavior, while allowing isolated/private
+# functional runs to prevent all outbound telemetry without altering conversion.
+if [[ "${EZBIDS_TELEMETRY_ENABLED:-true}" == "true" ]]; then
+    pet2bids_server="http://openneuropet.org/telemetry/"
 
-# Telemetry (to hard-coded pet2bids server)
-if [ -f $root/validator.json ]; then
-    curl -H 'Content-Type: application/json' -d @$root/validator.json -X POST $pet2bids_server || {
-        echo "Failed to send validator.json to $pet2bids_server"
-        true
-    }
-fi
+    # Telemetry (to hard-coded pet2bids server)
+    if [ -f $root/validator.json ]; then
+        curl -H 'Content-Type: application/json' -d @$root/validator.json -X POST $pet2bids_server || {
+            echo "Failed to send validator.json to $pet2bids_server"
+            true
+        }
+    fi
 
-if [ -f $root/ezBIDS_core_telemetry.json ]; then
-    curl -H 'Content-Type: application/json' -d @$root/ezBIDS_core_telemetry.json -X POST $pet2bids_server || {
-        echo "Failed to send ezBIDS_core_telemetry.json to $pet2bids_server"
-        true
-    }
-fi
+    if [ -f $root/ezBIDS_core_telemetry.json ]; then
+        curl -H 'Content-Type: application/json' -d @$root/ezBIDS_core_telemetry.json -X POST $pet2bids_server || {
+            echo "Failed to send ezBIDS_core_telemetry.json to $pet2bids_server"
+            true
+        }
+    fi
 
-if [ -f $root/ezBIDS_finalized_telemetry.json ]; then
-    curl -H 'Content-Type: application/json' -d @$root/ezBIDS_finalized_telemetry.json -X POST $pet2bids_server || {
-        echo "Failed to send ezBIDS_finalized_telemetry.json to $pet2bids_server"
-        true
-    }
+    if [ -f $root/ezBIDS_finalized_telemetry.json ]; then
+        curl -H 'Content-Type: application/json' -d @$root/ezBIDS_finalized_telemetry.json -X POST $pet2bids_server || {
+            echo "Failed to send ezBIDS_finalized_telemetry.json to $pet2bids_server"
+            true
+        }
+    fi
+else
+    echo "Outbound telemetry disabled (EZBIDS_TELEMETRY_ENABLED=false)."
 fi

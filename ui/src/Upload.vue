@@ -33,6 +33,7 @@
                         </el-button>
                         <input
                             ref="directoryInput"
+                            data-testid="upload-directory"
                             class="directory-input"
                             type="file"
                             directory
@@ -180,7 +181,7 @@
                 </div>
 
                 <div v-if="!ezbids.notLoaded && ezbids.objects.length">
-                    <h2>Analysis complete!</h2>
+                    <h2 data-testid="upload-analysis-complete">Analysis complete!</h2>
                     <AnalysisErrors />
                     <h3>
                         Object List <small>({{ ezbids.objects.length }})</small>

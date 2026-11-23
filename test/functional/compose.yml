@@ -1,0 +1,118 @@
+# This file is invoked by run.sh, which supplies unique image names and ports.
+# No deployment .env, existing container, bind-mounted data, or host port is reused.
+services:
+    mongodb:
+        image: ${EZBIDS_E2E_MONGO_IMAGE:-mongo:4.4.15}
+        networks: [functional]
+        volumes:
+            - database:/data/db
+        healthcheck:
+            test:
+                [
+                    CMD-SHELL,
+                    "echo 'db.runCommand({ping: 1}).ok' | mongo --quiet localhost:27017/ezbids_functional_test | grep -qx 1",
+                ]
+            interval: 2s
+            timeout: 5s
+            retries: 30
+
+    api:
+        image: ${EZBIDS_E2E_API_IMAGE:?Run test/functional/run.sh}
+        build:
+            context: ${EZBIDS_E2E_BUILD_CONTEXT:?Run test/functional/run.sh}
+            dockerfile: Dockerfile.api
+            args:
+                BASE_IMAGE: ${EZBIDS_E2E_API_BASE:-openneuropet/ezbids-api:latest}
+        init: true
+        networks: [functional, browser]
+        volumes:
+            - workdir:/tmp
+        ports:
+            - '127.0.0.1:${EZBIDS_E2E_API_PORT:?Run test/functional/run.sh}:8082'
+        environment:
+            MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids_functional_test
+            EZBIDS_AUTH_MODE: local
+            BRAINLIFE_AUTHENTICATION: 'false'
+            EZBIDS_REGISTRATION_ENABLED: 'true'
+            EZBIDS_SECURE_COOKIES: 'false'
+            EZBIDS_ALLOWED_ORIGINS: http://127.0.0.1:${EZBIDS_E2E_UI_PORT:?Run test/functional/run.sh}
+            EZBIDS_TRUSTED_PROXIES: ''
+            EZBIDS_TRUSTED_PROXY_NAMES: ''
+        depends_on:
+            mongodb:
+                condition: service_healthy
+        healthcheck:
+            test:
+                [
+                    CMD,
+                    node,
+                    -e,
+                    "require('http').get('http://127.0.0.1:8082/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+                ]
+            interval: 2s
+            timeout: 5s
+            retries: 45
+
+    handler:
+        image: ${EZBIDS_E2E_HANDLER_IMAGE:?Run test/functional/run.sh}
+        build:
+            context: ${EZBIDS_E2E_BUILD_CONTEXT:?Run test/functional/run.sh}
+            dockerfile: Dockerfile.handler
+            args:
+                BASE_IMAGE: ${EZBIDS_E2E_HANDLER_BASE:-openneuropet/ezbids-handler:latest}
+        init: true
+        networks: [functional, browser]
+        volumes:
+            - workdir:/tmp
+        environment:
+            MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids_functional_test
+            EZBIDS_AUTH_MODE: local
+            EZBIDS_TELEMETRY_ENABLED: 'false'
+            PET2BIDS_ENABLED: 'true'
+            PRESORT: 'false'
+        depends_on:
+            api:
+                condition: service_healthy
+
+    ui:
+        image: ${EZBIDS_E2E_UI_IMAGE:?Run test/functional/run.sh}
+        build:
+            context: ${EZBIDS_E2E_BUILD_CONTEXT:?Run test/functional/run.sh}
+            dockerfile: Dockerfile.ui
+            args:
+                BASE_IMAGE: ${EZBIDS_E2E_UI_BASE:-openneuropet/ezbids-ui:latest}
+                VITE_APIHOST: http://127.0.0.1:${EZBIDS_E2E_API_PORT:?Run test/functional/run.sh}
+                VITE_EZBIDS_AUTH_MODE: local
+                VITE_BRAINLIFE_AUTHENTICATION: 'false'
+        init: true
+        networks: [functional, browser]
+        ports:
+            - '127.0.0.1:${EZBIDS_E2E_UI_PORT:?Run test/functional/run.sh}:3000'
+        environment:
+            VITE_APIHOST: http://127.0.0.1:${EZBIDS_E2E_API_PORT:?Run test/functional/run.sh}
+            VITE_EZBIDS_AUTH_MODE: local
+            VITE_BRAINLIFE_AUTHENTICATION: 'false'
+        depends_on:
+            api:
+                condition: service_healthy
+        healthcheck:
+            test:
+                [
+                    CMD,
+                    node,
+                    -e,
+                    "require('http').get('http://127.0.0.1:3000/ezbids/', {headers: {Accept: 'text/html'}}, r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+                ]
+            interval: 2s
+            timeout: 5s
+            retries: 45
+
+networks:
+    functional:
+        internal: true
+    browser:
+        driver: bridge
+
+volumes:
+    database:
+    workdir:

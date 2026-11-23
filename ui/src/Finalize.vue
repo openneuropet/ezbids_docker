@@ -6,12 +6,12 @@
                 structure.
             </p>
             <p>
-                <el-checkbox v-model="ezbids.includeExcluded">
+                <el-checkbox v-model="ezbids.includeExcluded" data-testid="finalize-include-excluded">
                     Save all acquisitions set to 'exclude' in an excluded directory in output BIDS structure
                 </el-checkbox>
             </p>
             <br />
-            <el-button type="success" @click="finalize">Finalize</el-button>
+            <el-button data-testid="finalize-submit" type="success" @click="finalize">Finalize</el-button>
         </div>
 
         <div v-else-if="session.status == 'finalized' || (session.finalize_begin_date && !session.finalize_finish_date)">
@@ -31,9 +31,14 @@
                 <br />
                 <el-button type="success" style="float: right" size="small" @click="session.status = 'analyzed'">
                     Rerun Finalize Step</el-button>
-                <h3 style="margin-top: 0">All Done!</h3>
+                <h3 data-testid="finalize-completed" style="margin-top: 0">All Done!</h3>
                 <p>Please download the BIDS formatted data to your local computer</p>
-                <el-button style="width: 250px" type="primary" @click="download(`bids/${ezbids.datasetDescription.Name}`)">
+                <el-button
+                    data-testid="bids-download"
+                    style="width: 250px"
+                    type="primary"
+                    @click="download(`bids/${ezbids.datasetDescription.Name}`)"
+                >
                     Download BIDS
                 </el-button>
                 <el-button
@@ -92,11 +97,11 @@
             <el-row>
                 <el-col :span="12">
                     <h4>BIDS Structure</h4>
-                    <showfile path="tree.log" style="margin-right: 15px" :tall="true" />
+                    <showfile data-testid="bids-tree" path="tree.log" style="margin-right: 15px" :tall="true" />
                 </el-col>
                 <el-col :span="12">
                     <h4>bids-validator output</h4>
-                    <showfile path="validator.log" :tall="true" />
+                    <showfile data-testid="validator-report" path="validator.log" :tall="true" />
                 </el-col>
             </el-row>
         </div>

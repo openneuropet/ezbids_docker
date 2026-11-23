@@ -1,4 +1,4 @@
-.PHONY: gettestdata clean-testdata setup-test test-upload clean-test format-md
+.PHONY: gettestdata clean-testdata setup-test test-upload test-functional clean-test format-md
 
 # Create test_data directory if it doesn't exist
 test/test_data:
@@ -21,6 +21,10 @@ setup-test:
 # Run upload test
 test-upload: setup-test
 	cd test && uv run pytest upload_flat_folder_of_dicoms.py -v -s
+
+# Full browser workflow against an isolated container stack (see test/functional/README.md).
+test-functional:
+	test/functional/run.sh
 
 # Clean test environment
 clean-test:

@@ -1,0 +1,50 @@
+{
+    "dataset_name": "GE Advance PET phantom browser test",
+    "readme": "Public OpenNeuroPET phantom, not human participant data. Source: https://openneuropet.s3.amazonaws.com/US-sourced-OpenNeuroPET-Phantoms.zip (SHA256 85dc5d2e962f8dc0ee7e476812cd40d25990cbf277cf46dedcaf0979d3697851), sourcedata/GeneralElectricAdvance-NIMH/2d_unif_lt_ramp: 35 original DICOM slices. FDG/F18, dose 75.85 MBq, administration, acquisition mode and reconstruction provenance: the upstream OpenNeuroPET PET2BIDS scripts/python_conversions.sh GE Advance 2d_unif_lt_ramp conversion. TimeZero 09:28:23, InjectionStart -278 seconds, 14400-second frame duration and rectangle/4mm reconstruction filter come from the original DICOM acquisition time, radiopharmaceutical start time, ActualFrameDuration and ConvolutionKernel. FDG mass and specific radioactivity use BIDS-documented n/a values; no mass is invented. The profile intentionally follows raw DICOM timing instead of the conflicting old conversion-script FrameDuration override. Only original DICOMs are uploaded, never the archive's previously converted BIDS outputs.",
+    "subjects": [
+        {
+            "subject": "phantom01",
+            "sessions": [""]
+        }
+    ],
+    "series": [
+        {
+            "description": "2d_unif_lt_ramp",
+            "description_pattern": "^2d_unif_lt_ramp(?:_.*)?$",
+            "datatype": "pet/pet",
+            "entities": {},
+            "metadata": {
+                "Manufacturer": "GE MEDICAL SYSTEMS",
+                "ManufacturersModelName": "GE Advance",
+                "Units": "Bq/mL",
+                "BodyPart": "Phantom",
+                "TracerName": "FDG",
+                "TracerRadionuclide": "F18",
+                "InjectedRadioactivity": 75.85,
+                "InjectedRadioactivityUnits": "MBq",
+                "InjectedMass": { "type": "string", "value": "n/a" },
+                "InjectedMassUnits": { "type": "string", "value": "n/a" },
+                "SpecificRadioactivity": { "type": "string", "value": "n/a" },
+                "SpecificRadioactivityUnits": { "type": "string", "value": "n/a" },
+                "ModeOfAdministration": "infusion",
+                "TimeZero": "09:28:23",
+                "ScanStart": 0,
+                "InjectionStart": -278,
+                "FrameTimesStart": [0],
+                "FrameDuration": [14400],
+                "AcquisitionMode": "list mode",
+                "ImageDecayCorrected": true,
+                "ImageDecayCorrectionTime": 0,
+                "ReconMethodName": "2D Filtered Backprojection",
+                "ReconMethodParameterLabels": ["none"],
+                "ReconMethodParameterUnits": ["none"],
+                "ReconFilterType": { "type": "array", "value": ["rectangle"] },
+                "ReconFilterSize": [4],
+                "AttenuationCorrection": "measured"
+            }
+        }
+    ],
+    "expected_images": 1,
+    "expected_modality": "pet",
+    "expected_metadata_edits": ["AcquisitionMode"]
+}

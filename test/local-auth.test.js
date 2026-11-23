@@ -270,6 +270,56 @@ if (!mongoUrl) {
         assert.equal((await request(`/session/${legacy._id}`, { cookie: alice.cookie })).status, 200);
         assert.equal((await request(`/session/${legacy._id}`, { cookie: bob.cookie })).status, 404);
     });
+    test('reopening a finalized session streams its saved edits before legacy database content', async () => {
+        const directory = path.join(workdir, aliceSession._id);
+        const finalizedPath = path.join(directory, 'finalized.json');
+        const finalized = { datasetDescription: { Name: 'Edited phantom dataset' }, series: [{ type: 'pet/pet' }] };
+        await fs.mkdir(directory, { recursive: true });
+        await fs.writeFile(finalizedPath, JSON.stringify(finalized));
+        try {
+            const route = `/session/${aliceSession._id}/updated`;
+            const response = await request(route, { cookie: alice.cookie });
+            assert.equal(response.status, 200);
+            assert.match(response.headers.get('content-type'), /^application\/json/);
+            assert.deepEqual(await response.json(), finalized);
+            await models.ezBIDS.create({ _session_id: aliceSession._id, updated: { stale: true } });
+            assert.deepEqual(await (await request(route, { cookie: alice.cookie })).json(), finalized);
+        } finally {
+            await fs.rm(finalizedPath, { force: true });
+            await models.ezBIDS.deleteMany({ _session_id: aliceSession._id });
+        }
+    });
+    test('saved finalized metadata remains private from other accounts and guests', async () => {
+        const finalizedPath = path.join(workdir, aliceSession._id, 'finalized.json');
+        await fs.writeFile(finalizedPath, JSON.stringify({ privateEditedConfiguration: true }));
+        try {
+            const guest = await request('/session', { method: 'POST', body: {} });
+            const route = `/session/${aliceSession._id}/updated`;
+            assert.equal((await request(route, { cookie: bob.cookie })).status, 404);
+            assert.equal((await request(route, { cookie: cookieOf(guest) })).status, 404);
+            assert.equal((await request(route)).status, 401);
+            assert.equal((await request('/session/not-an-id/updated', { cookie: alice.cookie })).status, 400);
+        } finally {
+            await fs.rm(finalizedPath, { force: true });
+        }
+    });
+    test('legacy finalized metadata falls back only when the persisted file does not exist', async () => {
+        const route = `/session/${aliceSession._id}/updated`;
+        const finalizedPath = path.join(workdir, aliceSession._id, 'finalized.json');
+        const legacy = { datasetDescription: { Name: 'Legacy edited dataset' } };
+        assert.equal((await request(route, { cookie: alice.cookie })).status, 404);
+        await models.ezBIDS.create({ _session_id: aliceSession._id, updated: legacy });
+        try {
+            const response = await request(route, { cookie: alice.cookie });
+            assert.equal(response.status, 200);
+            assert.deepEqual(await response.json(), legacy);
+            await fs.mkdir(finalizedPath);
+            assert.equal((await request(route, { cookie: alice.cookie })).status, 500);
+        } finally {
+            await fs.rm(finalizedPath, { recursive: true, force: true });
+            await models.ezBIDS.deleteMany({ _session_id: aliceSession._id });
+        }
+    });
     test('downloads require the owner login and a token bound to the requested session', async () => {
         const directory = `${workdir}/${aliceSession._id}`;
         files.push(directory);

@@ -36,11 +36,19 @@
                 <template #default="scope">
                     <el-checkbox
                         v-model="scope.row.exclude"
+                        data-testid="subject-exclude"
+                        :data-subject-index="scope.$index"
                         title="Exclude all objects from BIDS output for this subject"
                     >
                         Exclude this subject
                     </el-checkbox>
-                    <el-input v-model.trim="scope.row.subject" size="small" @change="validate(scope.row)">
+                    <el-input
+                        v-model.trim="scope.row.subject"
+                        data-testid="subject-label"
+                        :data-subject-index="scope.$index"
+                        size="small"
+                        @change="validate(scope.row)"
+                    >
                         <template #prepend>sub-</template>
                     </el-input>
 
@@ -55,12 +63,18 @@
                                     <el-col :span="16">
                                         <el-checkbox
                                             v-model="sessionScope.row.exclude"
+                                            data-testid="session-exclude"
+                                            :data-subject-index="scope.$index"
+                                            :data-session-index="sessionScope.$index"
                                             title="Exclude all objects for this session"
                                         >
                                             Exclude this session
                                         </el-checkbox>
                                         <el-input
                                             v-model.trim="sessionScope.row.session"
+                                            data-testid="session-label"
+                                            :data-subject-index="scope.$index"
+                                            :data-session-index="sessionScope.$index"
                                             placeholder="no session"
                                             size="small"
                                             @change="validate(scope.row)"

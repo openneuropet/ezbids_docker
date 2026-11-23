@@ -36,6 +36,12 @@
                             v-for="o in section"
                             :key="o.idx"
                             class="clickable hierarchy-item"
+                            data-testid="object-row"
+                            :data-object-index="o.idx"
+                            :data-series-index="o.series_idx"
+                            :data-series-description="o._SeriesDescription"
+                            :data-subject="o._entities.subject"
+                            :data-session="o._entities.session"
                             :class="{ selected: so === o, excluded: isExcluded(o) }"
                             @click="select(o, o_ses)"
                         >
@@ -115,7 +121,9 @@
             <div v-if="so && sess">
                 <el-form label-width="200px">
                     <el-form-item>
-                        <el-checkbox v-model="so.exclude" @change="update(so)">Exclude this object</el-checkbox>
+                        <el-checkbox v-model="so.exclude" data-testid="object-exclude" @change="update(so)"
+                            >Exclude this object</el-checkbox
+                        >
                     </el-form-item>
                     <div v-if="isExcluded(so)" style="margin-bottom: 5px">
                         <el-alert :closable="false" type="info"

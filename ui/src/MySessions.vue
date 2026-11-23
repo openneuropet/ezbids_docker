@@ -1,18 +1,25 @@
 <template>
-    <main class="sessions">
+    <main class="sessions" data-testid="sessions-page">
         <h1>My sessions</h1>
-        <p>Signed in as {{ authState.user?.email }}</p>
-        <el-button type="primary" @click="newSession">New session</el-button>
-        <el-button @click="signOut">Log out</el-button>
+        <p data-testid="sessions-identity">Signed in as {{ authState.user?.email }}</p>
+        <el-button data-testid="sessions-new" type="primary" @click="newSession">New session</el-button>
+        <el-button data-testid="sessions-logout" @click="signOut">Log out</el-button>
         <el-alert v-if="error" :title="error" type="error" :closable="false" />
-        <p v-if="loading">Loading sessions…</p>
-        <p v-else-if="!sessions.length && !error">You have no previous sessions yet.</p>
-        <el-table v-else :data="sessions">
+        <p v-if="loading" data-testid="sessions-loading">Loading sessions…</p>
+        <p v-else-if="!sessions.length && !error" data-testid="sessions-empty">You have no previous sessions yet.</p>
+        <el-table v-else data-testid="sessions-table" :data="sessions">
             <el-table-column prop="_id" label="Session" />
             <el-table-column prop="create_date" label="Created" />
             <el-table-column prop="status" label="Status" />
             <el-table-column label="">
-                <template #default="scope"><el-button @click="openSession(scope.row._id)">Open</el-button></template>
+                <template #default="scope">
+                    <el-button
+                        data-testid="sessions-open"
+                        :data-session-id="scope.row._id"
+                        @click="openSession(scope.row._id)"
+                        >Open</el-button
+                    >
+                </template>
             </el-table-column>
         </el-table>
         <el-button v-if="hasMore" :loading="loading" @click="loadMore">Load older sessions</el-button>

@@ -75,7 +75,7 @@ export default defineComponent({
         <br />
         <el-form ref="descForm" label-width="150px" :model="dd" :rules="rules">
             <el-form-item label="Dataset Name" prop="Name">
-                <el-input v-model="dd.Name"></el-input>
+                <el-input v-model="dd.Name" data-testid="dataset-name"></el-input>
             </el-form-item>
             <el-form-item label="BIDSVersion" prop="BIDSVersion">
                 <el-input v-model="dd.BIDSVersion" disabled></el-input>
@@ -199,6 +199,7 @@ export default defineComponent({
             <el-form-item label="README(.md)">
                 <el-input
                     v-model="readme"
+                    data-testid="dataset-readme"
                     type="textarea"
                     placeholder="BIDS README. Should not be empty"
                     :autosize="{ minRows: 10, maxRows: 25 }"

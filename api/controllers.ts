@@ -451,23 +451,20 @@ router.get(
     validateUserCanAccessSession(false),
     (req: EzBIDSAuthRequestObject, res, next) => {
         const session = req.ezBIDS.session;
-
-        models.ezBIDS
-            .findOne({ _session_id: session._id })
-            .then((ezBIDS) => {
-                if (!ezBIDS) {
-                    return res
-                        .status(HTTP_STATUS.NOT_FOUND)
-                        .json({ message: 'no such session or ezBIDS not finalized' });
-                }
-
-                if (!ezBIDS.updated) {
-                    return res.status(HTTP_STATUS.NOT_FOUND).json({ message: 'not yet finalized' });
-                }
-
-                return res.status(HTTP_STATUS.OK).json(ezBIDS.updated);
-            })
-            .catch((err) => next(err));
+        const finalizedPath = path.resolve(config.workdir, String(session._id), 'finalized.json');
+        res.sendFile(finalizedPath, (err: NodeJS.ErrnoException) => {
+            if (!err) return;
+            if (err.code !== 'ENOENT') return next(err);
+            models.ezBIDS
+                .findOne({ _session_id: session._id })
+                .then((ezBIDS) => {
+                    if (!ezBIDS?.updated) {
+                        return res.status(HTTP_STATUS.NOT_FOUND).json({ message: 'not yet finalized' });
+                    }
+                    return res.status(HTTP_STATUS.OK).json(ezBIDS.updated);
+                })
+                .catch((error) => next(error));
+        });
     }
 );
 

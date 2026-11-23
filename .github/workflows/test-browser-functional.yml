@@ -1,0 +1,44 @@
+name: Full browser functional tests
+
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    phantom-workflow:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        env:
+            EZBIDS_E2E_ARTIFACTS: /tmp/ezbids-browser-artifacts
+            EZBIDS_E2E_DATA: /tmp/ezbids-phantoms-cache/ge-advance-2d
+        steps:
+            - uses: actions/checkout@v4
+            - uses: astral-sh/setup-uv@v6
+              with:
+                  python-version: '3.12'
+            - name: Install browser test dependencies
+              run: make setup-test
+            - name: Cache public phantom archive
+              uses: actions/cache@v4
+              with:
+                  path: /tmp/ezbids-phantoms-cache/US-sourced-OpenNeuroPET-Phantoms.zip
+                  key: openneuropet-phantom-85dc5d2e962f8dc0
+            - name: Prepare original DICOM fixture
+              run: test/.venv/bin/python test/functional/fetch_phantoms.py
+            - name: Pull conversion tools and dependency images
+              run: |
+                  docker pull openneuropet/ezbids-api:latest
+                  docker pull openneuropet/ezbids-handler:latest
+                  docker pull openneuropet/ezbids-ui:latest
+                  docker pull mongo:4.4.15
+            - name: Run guest and account browser workflows
+              run: make test-functional
+            - name: Save browser and container diagnostics
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: phantom-browser-results
+                  path: /tmp/ezbids-browser-artifacts
+                  retention-days: 7

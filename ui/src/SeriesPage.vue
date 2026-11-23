@@ -5,6 +5,9 @@
                 v-for="(s, series_idx) in ezbids.series"
                 :key="series_idx"
                 class="series-item"
+                data-testid="series-row"
+                :data-series-index="series_idx"
+                :data-series-description="s.SeriesDescription"
                 :class="{ selected: ss === s, excluded: s.type == 'exclude' }"
                 @click="ss = s"
             >
@@ -84,6 +87,7 @@
                     <el-form-item label="Datatype/Suffix">
                         <el-select
                             v-model="ss.type"
+                            data-testid="series-datatype"
                             required
                             filterable
                             placeholder="(exclude)"
@@ -117,6 +121,8 @@
                                 <template #reference>
                                     <el-input
                                         v-model="ss.entities[entity]"
+                                        data-testid="series-entity"
+                                        :data-entity="entity"
                                         size="small"
                                         :required="v == 'required'"
                                         @change="validateAll()"

@@ -52,21 +52,30 @@
                 </el-tooltip>
             </div>
 
-            <router-link v-if="authState.config.mode === 'local' && authState.user" to="/sessions"
+            <router-link
+                v-if="authState.config.mode === 'local' && authState.user"
+                data-testid="wizard-my-sessions"
+                to="/sessions"
                 >My sessions</router-link
             >
-            <router-link v-if="authState.config.mode === 'local' && !authState.user" to="/login"
+            <router-link
+                v-if="authState.config.mode === 'local' && !authState.user"
+                data-testid="wizard-login"
+                to="/login"
                 >Log in / Register</router-link
             >
             <ManageUsersDialog v-if="hasAuth"></ManageUsersDialog>
 
             <div v-if="authState.config.mode !== 'local' || authState.user" style="width: 135px; padding: 0 10px">
-                <el-button style="color: black; width: 100%; font-family: inherit" @click="handleSignout"
+                <el-button
+                    data-testid="wizard-signout"
+                    style="color: black; width: 100%; font-family: inherit"
+                    @click="handleSignout"
                     >Signout</el-button
                 >
             </div>
         </aside>
-        <section>
+        <section data-testid="wizard-step" :data-step="page">
             <Upload v-if="page === 'upload'" ref="upload" />
             <Description v-if="page === 'description'" ref="description" />
             <Subject v-if="page === 'subject'" ref="subject" />
@@ -86,11 +95,11 @@
 
             <br />
             <div v-if="session" class="page-action">
-                <el-button v-if="backLabel" :type="backButtonType" @click="back">
+                <el-button v-if="backLabel" data-testid="wizard-back" :type="backButtonType" @click="back">
                     <font-awesome-icon :icon="['fas', 'angle-left']" />
                     {{ backLabel }}
                 </el-button>
-                <el-button v-if="nextLabel" type="primary" style="float: right" @click="next">
+                <el-button v-if="nextLabel" data-testid="wizard-next" type="primary" style="float: right" @click="next">
                     {{ nextLabel }}
                     <font-awesome-icon :icon="['fas', 'angle-right']" />
                 </el-button>
