@@ -33,7 +33,11 @@ test/.venv/bin/python test/functional/fetch_phantoms.py
 This downloads the public 110 MiB archive referenced by PET2BIDS's phantom script, checks its pinned SHA256, and
 extracts only the 35 original GE Advance DICOMs (about 1.3 MiB) into `/tmp/ezbids-phantoms-cache/ge-advance-2d`. It
 rechecks cached files before reuse. `--cache-dir` and `--archive` support another cache or an already downloaded
-archive. Image data stays outside Git.
+archive. S3 is the source for these DICOMs; download them when needed and keep only a disposable local cache outside
+the checkout. Do not commit source DICOMs or the downloaded archive. Git ignores local DICOM files, `sourcedata/`
+directories, and this phantom archive as an additional safeguard.
+For the legacy `petdicoms` submodule, `test/gettestdata` also excludes extracted source directories inside that
+submodule, where the parent repository's ignore rules do not apply.
 
 ```bash
 test/functional/run.sh --data /tmp/ezbids-phantoms-cache/ge-advance-2d

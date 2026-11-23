@@ -16,6 +16,15 @@ git submodule update --init test/test_data/petdicoms
 git config submodule.test/test_data/dcm_qa_nih.ignore dirty
 git config submodule.test/test_data/dcm_qa_uih.ignore dirty
 git config submodule.test/test_data/petdicoms.ignore dirty
+# Parent ignore rules do not apply inside a submodule. Keep extracted source
+# data out of its change list without changing the upstream petdicoms checkout.
+(
+	cd test/test_data/petdicoms || exit 1
+	exclude_file=$(git rev-parse --git-path info/exclude) || exit 1
+	if ! grep -Fqx '/sourcedata/*/' "$exclude_file" 2>/dev/null; then
+		printf '\n# Disposable extracted source DICOMs\n/sourcedata/*/\n' >> "$exclude_file"
+	fi
+) || exit 1
 # Unzip petdicoms data
 echo "Unzipping petdicoms data..."
 cd test/test_data/petdicoms/sourcedata || exit 1

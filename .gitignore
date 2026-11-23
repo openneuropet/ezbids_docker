@@ -22,6 +22,14 @@ yarn-error.log*
 
 testdata
 
+# Fetch source DICOMs from S3 when needed; never commit local copies.
+*.[dD][cC][mM]
+*.[dD][iI][cC][oO][mM]
+*.[iI][mM][aA]
+**/sourcedata/
+US-sourced-OpenNeuroPET-Phantoms.zip
+ezbids-phantoms-cache/
+
 barn
 nohup.out
 tsc.log
