@@ -36,8 +36,7 @@ rechecks cached files before reuse. `--cache-dir` and `--archive` support anothe
 archive. S3 is the source for these DICOMs; download them when needed and keep only a disposable local cache outside
 the checkout. Do not commit source DICOMs or the downloaded archive. Git ignores local DICOM files, `sourcedata/`
 directories, and this phantom archive as an additional safeguard.
-For the legacy `petdicoms` submodule, `test/gettestdata` also excludes extracted source directories inside that
-submodule, where the parent repository's ignore rules do not apply.
+`test/gettestdata` and `test/createmixedfolder` use this same S3 fetcher for PET inputs; no PET DICOM submodule is needed.
 
 ```bash
 test/functional/run.sh --data /tmp/ezbids-phantoms-cache/ge-advance-2d

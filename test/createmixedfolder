@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # Check if test data exists, if not run gettestdata
-if [ ! -d "test/test_data/dcm_qa_nih" ] || [ ! -d "test/test_data/dcm_qa_uih" ] || [ ! -d "test/test_data/petdicoms" ]; then
+if [ ! -d "test/test_data/dcm_qa_nih" ] || [ ! -d "test/test_data/dcm_qa_uih" ]; then
     echo "Test data not found. Running gettestdata..."
-    make gettestdata
+    test/gettestdata
 fi
 
 # Create mixed folder if it doesn't exist
@@ -26,9 +27,9 @@ copy_dicoms "test/test_data/dcm_qa_nih" "$MIXED_FOLDER"
 # Copy DICOM files from dcm_qa_uih
 copy_dicoms "test/test_data/dcm_qa_uih" "$MIXED_FOLDER"
 
-# Copy DICOM files from petdicoms (excluding zip files)
-echo "Copying DICOM files from petdicoms..."
-find "test/test_data/petdicoms" -type f \( -iname "*.dcm" -o -iname "*.ima" -o -iname "*.img" \) -not -path "*.zip" -exec cp {} "$MIXED_FOLDER" \;
+# Fetch the verified PET source fixture from S3 rather than a Git submodule.
+pet_fixture=$(python3 test/functional/fetch_phantoms.py)
+copy_dicoms "$pet_fixture" "$MIXED_FOLDER"
 
 # Count the number of files copied
 file_count=$(find "$MIXED_FOLDER" -type f | wc -l)

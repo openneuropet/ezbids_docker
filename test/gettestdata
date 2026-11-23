@@ -1,4 +1,5 @@
 #! /usr/bin/env bash
+set -euo pipefail
 
 if [ ! -d "test/test_data/dcm_qa_nih" ]; then
 	git submodule add --force https://github.com/neurolabusc/dcm_qa_nih.git test/test_data/dcm_qa_nih
@@ -6,31 +7,10 @@ fi
 if [ ! -d "test/test_data/dcm_qa_uih" ]; then
 	git submodule add --force https://github.com/neurolabusc/dcm_qa_uih.git test/test_data/dcm_qa_uih
 fi
-if [ ! -d "test/test_data/petdicoms" ]; then
-	git submodule add --force https://github.com/openneuropet/petdicoms.git test/test_data/petdicoms
-fi
 git submodule update --init test/test_data/dcm_qa_nih
 git submodule update --init test/test_data/dcm_qa_uih
-git submodule update --init test/test_data/petdicoms
 # Prevent accidental commits to submodules
 git config submodule.test/test_data/dcm_qa_nih.ignore dirty
 git config submodule.test/test_data/dcm_qa_uih.ignore dirty
-git config submodule.test/test_data/petdicoms.ignore dirty
-# Parent ignore rules do not apply inside a submodule. Keep extracted source
-# data out of its change list without changing the upstream petdicoms checkout.
-(
-	cd test/test_data/petdicoms || exit 1
-	exclude_file=$(git rev-parse --git-path info/exclude) || exit 1
-	if ! grep -Fqx '/sourcedata/*/' "$exclude_file" 2>/dev/null; then
-		printf '\n# Disposable extracted source DICOMs\n/sourcedata/*/\n' >> "$exclude_file"
-	fi
-) || exit 1
-# Unzip petdicoms data
-echo "Unzipping petdicoms data..."
-cd test/test_data/petdicoms/sourcedata || exit 1
-for zip in *.zip; do
-	if [ -f "$zip" ]; then
-		echo "Unzipping $zip..."
-		unzip -q -o "$zip" -d "${zip%.zip}"
-	fi
-done
+# Fetch and verify the PET source fixture from S3 into an external cache.
+python3 test/functional/fetch_phantoms.py
