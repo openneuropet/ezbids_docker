@@ -13,6 +13,9 @@
                             </el-icon>
                             TEAM
                         </el-menu-item>
+                        <el-menu-item v-if="authState.config.mode === 'local' && !authState.user" index="login">
+                            <router-link to="/login">Log in / Register</router-link>
+                        </el-menu-item>
                         <el-menu-item index="2" class="menu-item">
                             <el-button
                                 type="text"
@@ -33,8 +36,10 @@
 import { defineComponent } from 'vue';
 import { mapState } from 'vuex';
 import { hasJWT, hasAuth } from './lib';
+import { authState } from './auth';
 
 export default defineComponent({
+    data: () => ({ authState }),
     computed: {
         ...mapState(['config']),
         hasAuth() {
@@ -49,6 +54,10 @@ export default defineComponent({
             window.open('https://brainlife.io/team/', '_blank');
         },
         redirectToBrainlifeAuth() {
+            if (authState.config.mode === 'local') {
+                this.$router.push(authState.user ? '/sessions' : '/convert');
+                return;
+            }
             if (!hasAuth() || hasJWT()) {
                 this.$router.push('/convert');
                 return;

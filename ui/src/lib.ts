@@ -1,3 +1,4 @@
+import { authState } from './auth';
 import { IEzbids, IEvents, IBIDSEvent } from './store';
 import axios from './axios.instance';
 //import { parseEvents } from './libUnsafe'
@@ -118,7 +119,7 @@ export function createEventsTSV(ezbids: IEzbids, events: IEvents) {
 }
 
 export function hasAuth() {
-    return import.meta.env.VITE_BRAINLIFE_AUTHENTICATION === 'true';
+    return authState.config.mode === 'brainlife';
 }
 
 export function hasJWT() {

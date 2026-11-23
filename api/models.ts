@@ -24,8 +24,14 @@ export function connect(cb: CallbackWithoutResult) {
         */
             //auto_reconnect: true, //isn't this the default?
         },
-        (err) => {
+        async (err) => {
             if (err) return cb(err);
+            try {
+                await User.init();
+                await LoginSession.init();
+            } catch (indexError) {
+                return cb(indexError);
+            }
             console.debug('connected to mongo via: ' + mongodb);
             return cb(null);
         }
@@ -46,6 +52,7 @@ export interface ISession {
     update_date: Date;
 
     ownerId: number;
+    ownerPrincipalId?: string;
     allowedUsers: number[];
 
     request_headers: any;
@@ -73,6 +80,7 @@ const sessionSchema = new Schema<ISession>({
     update_date: { type: Date, default: Date.now },
 
     ownerId: Schema.Types.Number,
+    ownerPrincipalId: { type: String, index: true },
     allowedUsers: [Schema.Types.Number],
 
     request_headers: Schema.Types.Mixed,
@@ -135,3 +143,19 @@ const ezbidsSchema = new Schema({
     update_date: { type: Date },
 });
 export const ezBIDS = model('ezBIDS', ezbidsSchema);
+
+const userSchema = new Schema({
+    email: { type: String, required: true, unique: true },
+    displayName: { type: String, required: true },
+    passwordHash: { type: String, required: true, select: false },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    disabled: { type: Boolean, default: false },
+    create_date: { type: Date, default: Date.now },
+});
+export const User = model('User', userSchema);
+const loginSessionSchema = new Schema({
+    tokenHash: { type: String, required: true, unique: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    expiresAt: { type: Date, required: true, expires: 0 },
+});
+export const LoginSession = model('LoginSession', loginSessionSchema);

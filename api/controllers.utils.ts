@@ -3,6 +3,8 @@ import { Request } from 'express-jwt';
 import { ISession, Session } from './models';
 import { Types, Document } from 'mongoose';
 import * as config from './config';
+import { userCanAccessSession } from './access-policy';
+import { principalId } from './auth';
 
 export enum HTTP_STATUS {
     OK = 200,
@@ -29,11 +31,11 @@ export const validateUserCanAccessSession = (onlyOwnerCanAccess: boolean) => {
         const sessionId = req.params.session_id;
         const userId = req.auth.sub as unknown as number;
 
-        if (!sessionId) {
+        if (!sessionId || !Types.ObjectId.isValid(sessionId)) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({ err: 'No sessionId found' });
         }
 
-        if (config.authentication && !userId) {
+        if (config.authMode !== 'disabled' && !userId) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({ err: 'No userId found' });
         }
 
@@ -44,15 +46,10 @@ export const validateUserCanAccessSession = (onlyOwnerCanAccess: boolean) => {
                         .status(HTTP_STATUS.NOT_FOUND)
                         .json({ err: 'Could not find session with ID: ' + sessionId });
 
-                if (config.authentication) {
-                    const isOwner = userId === (session.ownerId || '');
-                    const isInAllowedUserList = session.allowedUsers.some((allowedUser) => allowedUser === userId);
-
-                    if (onlyOwnerCanAccess && !isOwner) {
-                        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ err: 'unauthorized' });
-                    } else if (!onlyOwnerCanAccess && !isOwner && !isInAllowedUserList) {
-                        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ err: 'unauthorized' });
-                    }
+                if (
+                    !userCanAccessSession(config.authMode, principalId(req), req.auth.sub, session, onlyOwnerCanAccess)
+                ) {
+                    return res.status(404).json({ message: 'Session not found' });
                 }
 
                 req.ezBIDS = {

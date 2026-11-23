@@ -162,8 +162,7 @@ SSL_CERT_PATH=./nginx/ssl/sslcert.cert
 SSL_KEY_PATH=./nginx/ssl/sslcert.key
 SSL_PASSWORD_PATH=./nginx/ssl/sslpassword #if your key is not encrypted use an arbitrary path here
 
-# Set the BRAINLIFE_AUTHENTICATION environment variable to true, if you're not running"
-# this with brainlife don't use."
+# Set to true for Brainlife login; false enables local account registration and login.
 BRAINLIFE_AUTHENTICATION=false
 
 # Set the BRAINLIFE_DEVELOPMENT enables additional debugging output and mounts
@@ -187,8 +186,8 @@ EZBIDS_TMP_DIR=
 
 #### Environment Variable Details
 
-- `BRAINLIFE_AUTHENTICATION`: This version of ezBIDS has only been tested
-  without user authentication. You will want to keep this value set to false.
+- `BRAINLIFE_AUTHENTICATION`: Set to `true` for Brainlife login. When false or
+  unset, optional local account registration and login are enabled by default.
 - `PRESORT`: Enable this option if your data is a flat folder full of dicoms,
   otherwise it's best to organize your such that a single scan/session/modality
   is contained in it's own folder. In order to extract the necessary PET
@@ -202,6 +201,105 @@ EZBIDS_TMP_DIR=
   authority.
 - `SERVER_NAME`: Defaults to local host, if using Nginx then set this to the
   host name matching the server/ssl certificate.
+
+#### Local accounts and private session history
+
+Optional local account registration and login are enabled by default when
+`BRAINLIFE_AUTHENTICATION` is false or unset. The equivalent explicit configuration
+in `.env` is shown below. Rebuild/recreate the API and UI services after changes:
+
+```dotenv
+EZBIDS_AUTH_MODE=local
+EZBIDS_REGISTRATION_ENABLED=true
+EZBIDS_ALLOWED_ORIGINS=http://localhost:3000
+EZBIDS_SECURE_COOKIES=false
+```
+
+For an HTTPS deployment, set `EZBIDS_ALLOWED_ORIGINS` to the public origin
+(for example `https://ezbids.example.org`, without a trailing slash) and set
+`EZBIDS_SECURE_COOKIES=true`. Multiple allowed origins can be comma-separated.
+The certificate setup script writes these HTTPS settings into its generated `.env`.
+For older `.env` files missing these settings, `launch.sh` supplies defaults based
+on `SERVER_NAME` and `BRAINLIFE_USE_NGINX`, preserving explicit values. When
+switching an existing configuration to HTTPS, update any explicit HTTP origins
+and set secure cookies to `true`.
+For remote development with the default Compose setup, forward both UI port
+3000 and API port 8082, and open `http://localhost:3000/ezbids/`.
+
+The deployment entry points receive settings differently:
+
+| Deployment | Where settings come from | Origin/cookie defaults when unset |
+| --- | --- | --- |
+| HTTP Compose (`docker-compose.yml`, `docker-compose-dev.yaml`) | Project `.env` or exported shell variables | UI at `http://SERVER_NAME:3000` plus localhost origins; secure cookies off |
+| HTTPS Compose (`docker-compose-nginx.yml`) | Project `.env` or exported shell variables | `https://SERVER_NAME`; secure cookies on |
+| `launch.sh` | Sources `.env`, copying `example.env` if missing | Chooses the HTTP/HTTPS defaults above; explicit values win |
+| Combined Docker image | `docker run --env-file runtime.env` or `-e` | Local HTTP origins; secure cookies off |
+| Apptainer | Explicit `--env-file runtime.env` or `--env` with `--cleanenv` | Local HTTP origins; secure cookies off |
+
+For combined Docker and Apptainer deployments, a project `.env` is not loaded
+automatically. Pass a runtime environment file explicitly. For example, for local
+HTTP use:
+
+```dotenv
+BRAINLIFE_AUTHENTICATION=false
+EZBIDS_REGISTRATION_ENABLED=true
+EZBIDS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+EZBIDS_SECURE_COOKIES=false
+VITE_APIHOST=http://localhost:8082
+```
+
+Pass this file with `docker run --env-file runtime.env ...` or
+`apptainer instance run --cleanenv --env-file runtime.env ...`. Apptainer's
+[environment options](https://apptainer.org/docs/user/latest/environment_and_metadata.html)
+allow explicit settings alongside `--cleanenv`. Replace the origin and browser API
+URL for remote access. For an external HTTPS proxy, set secure cookies to `true`.
+The combined image inherits auth settings into its services; the UI queries the
+API for the active mode. Explicit `VITE_*` values override UI entrypoint defaults.
+For the nginx image, UI assets are built ahead of time; runtime auth configuration
+comes from the API, rather than Compose's UI environment at container startup.
+
+Users can convert as guests without registering or logging in. Guests access their
+work using a signed browser cookie (valid for 30 days); other browsers and accounts
+cannot open those sessions. Guest work is not added to an account's history.
+Users who register and log in can open their own previous uploads from **My sessions**.
+Session reads, uploads, changes, and downloads enforce ownership on the server;
+local accounts cannot share sessions or access another account's session by URL.
+Passwords use salted scrypt hashes. Login cookies are HttpOnly, expire after seven
+days, and are revoked on logout. Set `EZBIDS_REGISTRATION_ENABLED=false` to close
+registration while allowing existing users to log in. There is no email
+verification or self-service password reset in this version.
+
+Existing anonymous sessions are hidden in local mode because their original
+owner cannot be determined safely. An operator who has verified ownership can
+assign specific anonymous session IDs to an existing local account:
+
+```bash
+docker compose exec api npm run assign-legacy-sessions -- --email user@example.org SESSION_ID [SESSION_ID ...]
+```
+
+The script refuses a batch if any ID is missing or already belongs to an account.
+It does not claim anonymous sessions automatically during registration.
+
+Leaving `EZBIDS_AUTH_MODE` unset selects `brainlife` when
+`BRAINLIFE_AUTHENTICATION=true`, and `local` otherwise. Explicit modes are
+`disabled`, `brainlife`, and `local`; unrestricted anonymous access requires an explicit
+`EZBIDS_AUTH_MODE=disabled`.
+Disabling authentication allows anonymous access, so use `local` consistently on
+all API instances when deploying private accounts.
+
+Compile the API (`cd api && ../node_modules/.bin/tsc`) before running
+`npm run test:auth`. To include the database integration suite, set
+`EZBIDS_TEST_MONGO_URL=mongodb://HOST:PORT/ezbids_auth_test` to a disposable MongoDB
+instance. The suite creates accounts and sessions and drops that test database
+when finished; it refuses any other database name.
+Deployment configuration checks run separately with
+`python3 -m unittest discover -s test -p deployment_config_test.py`. They render
+Compose configuration and stub service launches and certificate generation;
+they do not start or restart the application stack. To also check Supervisor
+runtime environment inheritance, set `EZBIDS_TEST_COMBINED_IMAGE` to a locally
+built combined image when running the same command. That optional check starts
+an isolated container with networking disabled and substitutes environment-reporting
+processes for the API and UI.
 
 #### Nginx Setup
 
@@ -260,6 +358,13 @@ docker compose build -f docker-compose.yml (or docker-compose-nginx.yml) --build
 Using `--no-cache` might slow things down, but it's a way to ensure you don't
 run into issues with "stale" containers. The `--parallel` flag can speed things
 up as it will build multiple containers at once.
+
+### TODO
+
+- [ ] In a separate conversion fix, exclude `derivatives/` trees from input
+  discovery, including after archive extraction. FreeSurfer registration `.dat`
+  files inside derivatives are currently mistaken for MEG recordings. Cover this
+  case with a regression test; keep the fix outside the local-login feature branch.
 
 ### Authors
 

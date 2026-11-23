@@ -28,7 +28,17 @@ const options = {
 const swaggerSpec = swaggerJsdoc(options);
 //init express
 const app: express.Application = express();
-app.use(cors());
+app.use((req, res, next) => {
+    if (config.authMode === 'local') {
+        const origin = req.headers.origin;
+        if (origin && !config.allowedOrigins.includes(origin)) return res.status(403).json({ message: 'Origin not allowed' });
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers['sec-fetch-site'] === 'cross-site') {
+            return res.status(403).json({ message: 'Cross-site request not allowed' });
+        }
+    }
+    next();
+});
+app.use(cors(config.authMode === 'local' ? { origin: config.allowedOrigins, credentials: true } : {}));
 app.use(compression());
 app.use(nocache());
 //app.use(sendSeekable);

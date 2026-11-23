@@ -13,7 +13,10 @@
         "style-check": "prettier --config .prettierrc.json --check",
         "lint-check": "eslint --ext .ts,.vue,.js",
         "lint-staged": "lint-staged --config .lintstagedrc.json",
-        "prepare-husky": "husky install"
+        "prepare-husky": "husky install",
+        "create-admin": "node api/create-admin.js",
+        "assign-legacy-sessions": "node api/assign-legacy-sessions.js",
+        "test:auth": "node --test test/access-policy.test.js test/local-auth.test.js"
     },
     "author": "",
     "license": "MIT",

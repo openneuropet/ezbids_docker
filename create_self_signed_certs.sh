@@ -34,9 +34,19 @@ NGINX_CONFIG_FILE=nginx/production_nginx.conf
 
 BRAINLIFE_USE_NGINX=true
 
-# Set the BRAINLIFE_AUTHENTICATION environment variable to true, if you're not running
-# this with brainlife don't use.
+# Set to true for Brainlife login; false enables optional local accounts.
+# Guests can still convert without logging in.
 BRAINLIFE_AUTHENTICATION=false
+
+# Leave blank to select Brainlife when enabled above, otherwise local accounts.
+# Explicit modes: local, brainlife, disabled (unrestricted anonymous access).
+EZBIDS_AUTH_MODE=
+EZBIDS_REGISTRATION_ENABLED=true
+
+# Allowed UI origins: comma-separated scheme://host[:port], no path or trailing slash.
+EZBIDS_ALLOWED_ORIGINS=https://$HOSTNAME
+# This setup uses HTTPS, so send login and guest cookies only over HTTPS.
+EZBIDS_SECURE_COOKIES=true
 
 # Set the BRAINLIFE_DEVELOPMENT enables additional debugging output and mounts 
 # the ezbids repo/folder into the various containers default is false

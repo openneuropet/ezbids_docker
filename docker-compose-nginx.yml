@@ -39,6 +39,10 @@ services:
         environment:
             MONGO_CONNECTION_STRING: mongodb://mongodb:27017/ezbids
             BRAINLIFE_AUTHENTICATION: ${BRAINLIFE_AUTHENTICATION:-false}
+            EZBIDS_AUTH_MODE: ${EZBIDS_AUTH_MODE:-}
+            EZBIDS_REGISTRATION_ENABLED: ${EZBIDS_REGISTRATION_ENABLED:-true}
+            EZBIDS_SECURE_COOKIES: ${EZBIDS_SECURE_COOKIES:-true}
+            EZBIDS_ALLOWED_ORIGINS: ${EZBIDS_ALLOWED_ORIGINS:-https://${SERVER_NAME:-localhost}}
         networks:
             - ezbids
 

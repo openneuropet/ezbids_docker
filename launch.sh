@@ -68,9 +68,18 @@ git submodule update --init --recursive
 # from outside of the computer it's hosted on, you don't need nginx.
 if [[ $BRAINLIFE_USE_NGINX == true ]]; then
   DOCKER_COMPOSE_FILE=docker-compose-nginx.yml
+  # Supply local-login defaults for older .env files that lack these settings.
+  export EZBIDS_ALLOWED_ORIGINS="${EZBIDS_ALLOWED_ORIGINS:-https://${SERVER_NAME:-localhost}}"
+  export EZBIDS_SECURE_COOKIES="${EZBIDS_SECURE_COOKIES:-true}"
 else
   DOCKER_COMPOSE_FILE=docker-compose.yml
+  export EZBIDS_ALLOWED_ORIGINS="${EZBIDS_ALLOWED_ORIGINS:-http://${SERVER_NAME:-localhost}:3000,http://localhost:3000,http://127.0.0.1:3000}"
+  export EZBIDS_SECURE_COOKIES="${EZBIDS_SECURE_COOKIES:-false}"
 fi
+
+echo "Effective local-login browser settings (explicit .env values take precedence):"
+echo "    EZBIDS_ALLOWED_ORIGINS=${EZBIDS_ALLOWED_ORIGINS}"
+echo "    EZBIDS_SECURE_COOKIES=${EZBIDS_SECURE_COOKIES}"
 
 # Create the working directory if it doesn't exist
 if [[ ${EZBIDS_TMP_DIR} ]]; then

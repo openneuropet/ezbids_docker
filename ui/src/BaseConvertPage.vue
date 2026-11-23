@@ -52,9 +52,15 @@
                 </el-tooltip>
             </div>
 
+            <router-link v-if="authState.config.mode === 'local' && authState.user" to="/sessions"
+                >My sessions</router-link
+            >
+            <router-link v-if="authState.config.mode === 'local' && !authState.user" to="/login"
+                >Log in / Register</router-link
+            >
             <ManageUsersDialog v-if="hasAuth"></ManageUsersDialog>
 
-            <div style="width: 135px; padding: 0 10px">
+            <div v-if="authState.config.mode !== 'local' || authState.user" style="width: 135px; padding: 0 10px">
                 <el-button style="color: black; width: 100%; font-family: inherit" @click="handleSignout"
                     >Signout</el-button
                 >
@@ -111,6 +117,7 @@ import Feedback from './Feedback.vue';
 import ManageUsersDialog from './components/dialogs/ManageUsersDialog.vue';
 import { IObject } from './store';
 import { hasAuth, createEventsTSV } from './lib';
+import { authState, logout } from './auth';
 
 //https://github.com/element-plus/element-plus/issues/436#issuecomment-961386582
 import { ElNotification } from 'element-plus';
@@ -139,6 +146,8 @@ export default defineComponent({
 
     data() {
         return {
+            authState,
+            pollTimer: undefined as number | undefined,
             //page order
             pages: [
                 'upload',
@@ -201,13 +210,19 @@ export default defineComponent({
     async created() {
         this.$store.commit('reset');
         if (location.hash) {
-            await this.$store.dispatch('reload', location.hash.substring(1));
+            try {
+                await this.$store.dispatch('reload', location.hash.substring(1));
+            } catch {
+                this.$store.commit('reset');
+                await this.$router.replace(authState.config.mode === 'local' ? '/sessions' : '/');
+                return;
+            }
             this.mapObjects();
             this.$store.commit('organizeObjects');
-            this.$store.dispatch('loadDefaceStatus');
+            if (this.session?.pre_finish_date) this.$store.dispatch('loadDefaceStatus');
         }
 
-        window.setInterval(async () => {
+        this.pollTimer = window.setInterval(async () => {
             if (this.session) {
                 switch (this.session.status) {
                     case 'analyzed':
@@ -228,6 +243,10 @@ export default defineComponent({
                 }
             }
         }, 5000);
+    },
+
+    beforeUnmount() {
+        window.clearInterval(this.pollTimer);
     },
 
     methods: {
@@ -342,7 +361,12 @@ export default defineComponent({
 
             o._entities = e;
         },
-        handleSignout() {
+        async handleSignout() {
+            if (authState.config.mode === 'local') {
+                await logout();
+                window.location.assign('/ezbids/login');
+                return;
+            }
             document.location.href = this.config.authSignOut;
         },
     },

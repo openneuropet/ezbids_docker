@@ -2,13 +2,15 @@ import axios from 'axios';
 import { ElNotification } from 'element-plus';
 import router from './routes';
 import { hasAuth } from './lib';
+import { authState } from './auth';
 
 const axiosInstance = axios.create({
     headers: { 'Content-Type': 'application/json; charset=UTF-8' },
 });
 
 axiosInstance.interceptors.request.use((config) => {
-    if (!hasAuth()) return config;
+    config.withCredentials = authState.config.mode === 'local';
+    if (authState.config.mode !== 'brainlife' || !hasAuth()) return config;
     const token = localStorage.getItem('jwt');
     if (token) {
         config.headers = {
@@ -30,7 +32,9 @@ axiosInstance.interceptors.response.use(
     (err) => {
         if (err.response) {
             if (err.response.status === 401) {
-                router.push('/');
+                authState.user = null;
+                authState.userLoaded = true;
+                router.push(authState.config.mode === 'local' ? '/login' : '/');
                 ElNotification({
                     title: 'Unauthorized access',
                     message: '',
